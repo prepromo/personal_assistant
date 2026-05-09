@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cabinet UI (Vite)</title>
+  <style>
+    body { font-family: system-ui; max-width: 520px; margin: 2rem auto; padding: 0 1rem; }
+    pre { background: #f4f4f5; padding: 0.75rem; overflow: auto; font-size: 0.8rem; }
+    input, button { margin: 0.25rem 0; width: 100%; padding: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Кабинет (Vite → proxy /api)</h1>
+  <p>API проксируется на <code>127.0.0.1:4050</code>. Сначала запустите <code>telegram-user</code> API.</p>
+  <label>Email <input id="email" type="email" /></label>
+  <label>Пароль <input id="password" type="password" /></label>
+  <button type="button" id="btnLogin">Вход</button>
+  <button type="button" id="btnMe">GET /api/v1/auth/me</button>
+  <pre id="out"></pre>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

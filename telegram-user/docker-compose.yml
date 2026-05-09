@@ -1,0 +1,42 @@
+# Локальный стек: Postgres + API (telegram-user).
+# Коннектор Pyrogram (worker) запускайте отдельно на хосте или в другом compose.
+#
+# Запуск из каталога telegram-user:
+#   docker compose up -d --build
+# API: http://127.0.0.1:4050/mvp.html
+#
+# Переменные для api задайте в .env рядом или через environment ниже.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tguser
+      POSTGRES_PASSWORD: tguser
+      POSTGRES_DB: tguser
+    ports:
+      - "5433:5432"
+    volumes:
+      - tg_user_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tguser -d tguser"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "4050:4050"
+    environment:
+      DATABASE_URL: postgresql://tguser:tguser@postgres:5432/tguser
+      PORT: "4050"
+      SESSION_ENCRYPTION_KEY: ${SESSION_ENCRYPTION_KEY:-dev-mvp-key-32-characters-minimum!!}
+      CONNECTOR_SECRET: ${CONNECTOR_SECRET:-local-dev-connector-secret-2026}
+      AGENT_API_TOKEN: ${AGENT_API_TOKEN:-local-dev-agent-token-2026}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  tg_user_pgdata:

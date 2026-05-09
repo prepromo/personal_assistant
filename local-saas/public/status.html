@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Статус сервисов — Local OpenClaw</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/landing.css" />
+  <style>
+    .article { max-width: 900px; margin: 0 auto; padding: 1rem 1.25rem 2.5rem; }
+    .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 1rem 0; }
+    .tile {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      font-size: 0.88rem;
+    }
+    .tile h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+    .ok { color: #4ade80; }
+    .bad { color: #f87171; }
+    pre.json { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; font-size: 0.72rem; overflow: auto; max-height: 320px; }
+    .links a { display: block; margin: 0.25rem 0; }
+  </style>
+</head>
+<body class="page-landing">
+  <header class="topbar">
+    <a class="logo" href="/">Local OpenClaw</a>
+    <nav class="topnav">
+      <a href="/">Главная</a>
+      <a href="/dashboard.html">Кабинет</a>
+      <a href="/docs.html">Документация</a>
+    </nav>
+  </header>
+  <article class="article">
+    <h1>Статус сервисов</h1>
+    <p class="lead">Проверка с <code>http://127.0.0.1:3090/api/status</code>. Подсказки — см. <code>RUNBOOK.md</code> в корне репозитория.</p>
+
+    <div class="grid" id="tiles"></div>
+
+    <h2 style="font-size:1rem;margin:1.25rem 0 0.5rem">Быстрые ссылки</h2>
+    <div class="tile links">
+      <a href="/api/health" target="_blank" rel="noopener">local-saas /api/health</a>
+      <a href="/api/status" target="_blank" rel="noopener">local-saas /api/status (JSON)</a>
+      <a href="http://127.0.0.1:8090/v1/models" target="_blank" rel="noopener">gpt2giga /v1/models</a> (если не требует ключа в браузере — иначе через curl)
+      <a href="http://127.0.0.1:4050/health" target="_blank" rel="noopener">telegram-user /health</a> (если API запущен)
+    </div>
+
+    <h2 style="font-size:1rem;margin:1.25rem 0 0.5rem">Полный JSON</h2>
+    <pre class="json" id="raw">Загрузка…</pre>
+  </article>
+  <script>
+    const tiles = document.getElementById("tiles");
+    const raw = document.getElementById("raw");
+    function badge(ok) {
+      return ok ? '<span class="ok">доступен</span>' : '<span class="bad">нет ответа</span>';
+    }
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((j) => {
+        raw.textContent = JSON.stringify(j, null, 2);
+        const g = j.gpt2giga || {};
+        const tu = j.telegramUser || {};
+        const oc = j.openclawGateway || {};
+        tiles.innerHTML =
+          '<div class="tile"><h3>gpt2giga</h3>' +
+          badge(!!g.ok) +
+          "<br><small>" +
+          (g.base || "") +
+          "</small></div>" +
+          '<div class="tile"><h3>telegram-user (опционально)</h3>' +
+          badge(!!tu.ok) +
+          "<br><small>" +
+          (tu.healthUrl || "") +
+          "</small></div>" +
+          '<div class="tile"><h3>OpenClaw gateway</h3>' +
+          (oc.configured
+            ? badge(!!oc.http?.ok) + "<br><small>" + (oc.url || "") + "</small>"
+            : '<span class="bad">не задан в .env</span>') +
+          "</div>";
+      })
+      .catch((e) => {
+        raw.textContent = String(e);
+      });
+  </script>
+</body>
+</html>

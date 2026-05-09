@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Secrets & local env (do not use `.env.*` — it would ignore `.env.example`)
+.env
+.env.local
+.env.development
+.env.production
+
+# Python
+**/.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+
+# Build / cache
+dist/
+*.tsbuildinfo
+.cache/
+
+# DB files (local)
+*.db
+*.db-journal
+
+# Tooling / IDE
+.cursor/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs & temp
+*.log
+_api_err.txt
+_api_out.txt
+
+# Telegram-user local artifacts
+telegram-user/.last-account-id

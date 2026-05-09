@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local OpenClaw — персональный агент (локально)</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/landing.css" />
+</head>
+<body class="page-landing">
+  <header class="topbar">
+    <a class="logo" href="/">Local OpenClaw</a>
+    <nav class="topnav">
+      <a href="/channels.html">Каналы</a>
+      <a href="/agent.html">Агент</a>
+      <a href="/docs.html">Документация</a>
+      <a href="/status.html">Статус</a>
+      <a href="/subscription.html">Тарифы</a>
+      <a href="/login.html" class="muted">Вход</a>
+      <a class="btn btn-sm" href="/dashboard.html">Кабинет</a>
+    </nav>
+  </header>
+
+  <main class="hero">
+    <p class="hero-badge">Локальная сборка · GigaChat + опционально OpenClaw gateway</p>
+    <h1>Персональный AI-ассистент на вашей машине</h1>
+    <p class="hero-lead">
+      Веб-чат, выбор моделей через gpt2giga, переключение на полноценного агента OpenClaw (если запущен gateway).
+      Без оплаты и без облака — для разработки и тестов.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="/dashboard.html">Открыть кабинет</a>
+      <a class="btn btn-outline" href="/status.html">Статус сервисов</a>
+    </div>
+  </main>
+
+  <section class="features">
+    <div class="feature-card">
+      <h3>Модели GigaChat</h3>
+      <p>Список из <code>/v1/models</code> проксируется в кабинет — выберите нужную строку, как на коммерческих панелях.</p>
+    </div>
+    <div class="feature-card">
+      <h3>OpenClaw gateway</h3>
+      <p>При токене в <code>.env</code> можно слать чат в агента (инструменты, Telegram-бот и т.д. — на стороне gateway).</p>
+    </div>
+    <div class="feature-card">
+      <h3>Каналы</h3>
+      <p>Telegram-бот подключается через OpenClaw отдельно: см. раздел <a href="/channels.html">Каналы</a>.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Стек рядом</h3>
+      <p><a href="http://127.0.0.1:4050/" target="_blank" rel="noopener">telegram-user</a> — личный аккаунт и API (если запущен).</p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>Не является сервисом openclaw.ru — это ваш dev-портал в репозитории VPN_service.</span>
+  </footer>
+</body>
+</html>

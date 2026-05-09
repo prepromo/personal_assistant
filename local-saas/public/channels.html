@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Каналы — Local OpenClaw</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/landing.css" />
+  <style>
+    .article { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    .article h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+    .article h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; color: var(--muted); }
+    .article p, .article li { color: var(--muted); font-size: 0.92rem; line-height: 1.55; }
+    .article ol { padding-left: 1.25rem; }
+    .article code { font-size: 0.85em; background: var(--card); padding: 0.1em 0.35em; border-radius: 4px; }
+  </style>
+</head>
+<body class="page-landing">
+  <header class="topbar">
+    <a class="logo" href="/">Local OpenClaw</a>
+    <nav class="topnav">
+      <a href="/">Главная</a>
+      <a href="/dashboard.html">Кабинет</a>
+      <a href="/docs.html">Документация</a>
+    </nav>
+  </header>
+  <article class="article">
+    <h1>Каналы связи (Telegram)</h1>
+    <p>На <strong>openclaw.ru</strong> каналы подключаются в облаке. У вас локально роль канала выполняет <strong>OpenClaw gateway</strong> с токеном бота из <code>openclaw/.env</code>.</p>
+    <h2>Шаги</h2>
+    <ol>
+      <li>Создайте бота в @BotFather, получите <code>TELEGRAM_BOT_TOKEN</code>.</li>
+      <li>Пропишите токен в <code>openclaw/.env</code> и запустите <code>openclaw\scripts\start-gateway.ps1</code> (или полный стек из README OpenClaw).</li>
+      <li>При <code>dmPolicy: pairing</code> одобрите доступ: <code>openclaw pairing approve telegram …</code></li>
+      <li>Этот веб-портал (<code>local-saas</code>) — отдельно; чат в браузере идёт через gpt2giga или через gateway, если выбран провайдер OpenClaw в кабинете.</li>
+    </ol>
+    <h2>Личный аккаунт Telegram (не бот)</h2>
+    <p>Для MTProto и синка диалогов используйте проект <strong>telegram-user</strong> на порту 4050 — см. <code>telegram-user/README.md</code>.</p>
+    <p><a href="/dashboard.html">← В кабинет</a></p>
+  </article>
+</body>
+</html>

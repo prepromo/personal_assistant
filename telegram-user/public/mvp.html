@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Тестовый MVP — Telegram User</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3d8bfd;
+      --accent-dim: #2563eb;
+      --border: #2a3644;
+      --err: #f87171;
+      --ok: #4ade80;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 1rem 1.25rem 2rem;
+      line-height: 1.45;
+      max-width: 720px;
+      margin-inline: auto;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 1.25rem; font-weight: 600; margin: 0; flex: 1; min-width: 200px; }
+    header a.back {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    header a.back:hover { text-decoration: underline; }
+    .banner-ok, .banner-err {
+      width: 100%;
+      font-size: 0.85rem;
+      padding: 0.5rem 0.65rem;
+      border-radius: 8px;
+      display: none;
+    }
+    .banner-ok { display: block; background: rgba(74, 222, 128, 0.12); color: var(--ok); border: 1px solid rgba(74, 222, 128, 0.35); }
+    .banner-err { display: block; background: rgba(248, 113, 113, 0.12); color: var(--err); border: 1px solid rgba(248, 113, 113, 0.35); }
+    p.note { color: var(--muted); font-size: 0.88rem; margin: 0 0 1rem; }
+    .steps { counter-reset: step; }
+    section.step {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    section.step h2 {
+      font-size: 1rem;
+      margin: 0 0 0.75rem;
+      color: var(--text);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    section.step h2::before {
+      counter-increment: step;
+      content: counter(step);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.2rem; }
+    input, textarea, select {
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.9rem;
+      margin-bottom: 0.65rem;
+    }
+    textarea { min-height: 72px; font-family: ui-monospace, monospace; font-size: 0.78rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: flex-end; }
+    .row > div { flex: 1; min-width: 160px; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-right: 0.35rem;
+      margin-bottom: 0.35rem;
+    }
+    button.secondary { background: #374151; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-row { margin-top: 0.35rem; }
+    pre.raw {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem;
+      overflow: auto;
+      max-height: 200px;
+      font-size: 0.72rem;
+      margin: 0.5rem 0 0;
+    }
+    .status { font-size: 0.85rem; margin-top: 0.45rem; }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+    a { color: var(--accent); }
+    #dialogList {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin: 0.65rem 0;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    #dialogList button.pick {
+      text-align: left;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      margin: 0;
+      padding: 0.45rem 0.6rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    #dialogList button.pick:hover { border-color: var(--accent); }
+    #dialogList button.pick.selected { border-color: var(--accent); background: rgba(61, 139, 253, 0.12); }
+    details.more {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.65rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    details.more summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    details.more section { margin-top: 0.75rem; border: none; padding: 0; background: transparent; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Тестовый MVP</h1>
+    <a class="back" href="/start.html">← На стартовую</a>
+    <div id="bannerOk" class="banner-ok" style="display:none"></div>
+    <div id="bannerErr" class="banner-err" style="display:none"></div>
+  </header>
+
+  <p class="note">
+    Откройте эту страницу с того же хоста, что и API (обычно уже так). Адрес API подставится сам.
+    Токен и поля сохраняются в <code>localStorage</code> браузера — только для локальной отладки.
+  </p>
+
+  <div class="steps">
+    <section class="step">
+      <h2>Подключение к API</h2>
+      <div class="row">
+        <div>
+          <label>Адрес API (оставьте как есть, если зашли с <code>http://127.0.0.1:4050/...</code>)</label>
+          <input id="apiBase" type="text" placeholder="http://127.0.0.1:4050" autocomplete="off" />
+        </div>
+        <div>
+          <label><code>AGENT_API_TOKEN</code> из файла <code>telegram-user/.env</code></label>
+          <input id="agentToken" type="password" autocomplete="off" placeholder="Вставьте токен" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="button" id="btnSave">Сохранить в браузере</button>
+        <button type="button" class="secondary" id="btnHealth">Проверить /health</button>
+      </div>
+      <div class="status" id="statusApi"></div>
+      <pre class="raw" id="outHealth" style="display:none"></pre>
+    </section>
+
+    <section class="step">
+      <h2>Учётная запись Telegram</h2>
+      <p class="note" style="margin-top:0">Тот же <code>APP_USER_ID</code>, что в <code>connector/.env</code> (например <code>user-388963917</code>).</p>
+      <div class="row">
+        <div>
+          <label>appUserId</label>
+          <input id="prodAppUserId" type="text" placeholder="user-…" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="button" id="btnResolveAccount">Узнать accountId по appUserId</button>
+      </div>
+      <label>accountId (подставится кнопкой выше или вручную)</label>
+      <input id="accountId" type="text" placeholder="uuid" />
+      <div class="btn-row">
+        <button type="button" id="btnDialogs">Загрузить диалоги</button>
+      </div>
+      <div class="status" id="statusDialogs"></div>
+      <p class="note" style="margin:0.5rem 0 0">Выберите диалог (клик):</p>
+      <div id="dialogList"></div>
+      <details class="more" style="margin-top:0.5rem">
+        <summary>Сырой JSON ответа</summary>
+        <pre class="raw" id="outApi"></pre>
+      </details>
+    </section>
+
+    <section class="step">
+      <h2>Сообщения и отправка</h2>
+      <label>Выбранный dialogId</label>
+      <input id="dialogId" type="text" placeholder="после выбора диалога выше" />
+      <div class="btn-row">
+        <button type="button" id="btnMessages">Загрузить сообщения</button>
+      </div>
+      <pre class="raw" id="outMessages"></pre>
+      <label>Текст для отправки в чат</label>
+      <input id="sendText" type="text" placeholder="Тестовое сообщение" />
+      <div class="btn-row">
+        <button type="button" id="btnSend">Отправить (очередь → worker)</button>
+      </div>
+      <pre class="raw" id="outSend"></pre>
+    </section>
+  </div>
+
+  <details class="more">
+    <summary>Задачи и напоминания (v1)</summary>
+    <section>
+      <p class="note">Нужны <code>appUserId</code> и токен из шага 1. Для напоминаний в Telegram — запущенный <code>worker.py</code>.</p>
+      <div class="row">
+        <div><label>Новая задача (title)</label><input id="taskTitle" type="text" placeholder="Сделать звонок" /></div>
+      </div>
+      <button type="button" id="btnTasksLoad">Список задач</button>
+      <button type="button" id="btnTaskAdd">Добавить задачу</button>
+      <pre class="raw" id="outTasks"></pre>
+      <div class="row">
+        <div><label>Напоминание — заголовок</label><input id="remTitle" type="text" /></div>
+        <div><label>Текст</label><input id="remText" type="text" /></div>
+      </div>
+      <div class="row">
+        <div><label>Время (локальное)</label><input id="remFireAt" type="datetime-local" /></div>
+      </div>
+      <label><input type="checkbox" id="remTg" checked /> В Telegram</label>
+      <label style="margin-left:1rem"><input type="checkbox" id="remWeb" checked /> В веб-панели</label>
+      <div class="btn-row">
+        <button type="button" id="btnRemLoad">Список напоминаний</button>
+        <button type="button" id="btnRemAdd">Создать напоминание</button>
+        <button type="button" class="secondary" id="btnWebInbox">Веб-инбокс (7 дней)</button>
+      </div>
+      <pre class="raw" id="outRem"></pre>
+    </section>
+  </details>
+
+  <details class="more">
+    <summary>Вход по телефону (auth_server, опционально)</summary>
+    <section>
+      <p class="note">Отдельно: <code>python auth_server.py</code> или <code>.\scripts\run-auth-server.ps1</code> — порт <strong>4052</strong>.</p>
+      <div class="row">
+        <div><label>URL auth-сервера</label><input id="authBase" type="text" value="http://127.0.0.1:4052" /></div>
+        <div><label>appUserId</label><input id="authAppUserId" type="text" placeholder="UUID из connector/.env" /></div>
+      </div>
+      <div class="row">
+        <div><label>Телефон (+7…)</label><input id="authPhone" type="text" placeholder="+79991234567" /></div>
+        <div><label>X-Connector-Secret</label><input id="authSecret" type="password" autocomplete="off" /></div>
+      </div>
+      <button type="button" id="btnSendCode">Отправить код</button>
+      <div class="row">
+        <div><label>Код из Telegram / SMS</label><input id="authCode" type="text" /></div>
+      </div>
+      <button type="button" id="btnVerifyCode">Подтвердить код</button>
+      <div class="row" id="row2fa" style="display:none">
+        <div><label>2FA пароль (если включён)</label><input id="authPwd" type="password" /></div>
+      </div>
+      <button type="button" id="btn2fa" style="display:none">Отправить пароль 2FA</button>
+      <pre class="raw" id="outAuth"></pre>
+    </section>
+  </details>
+
+  <script>
+    const LS = "tg_mvp_";
+    const $ = (id) => document.getElementById(id);
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function defaultApiBase() {
+      const o = window.location;
+      if (o.protocol === "http:" || o.protocol === "https:") {
+        return o.origin;
+      }
+      return "http://127.0.0.1:4050";
+    }
+
+    function load() {
+      $("apiBase").value = localStorage.getItem(LS + "apiBase") || defaultApiBase();
+      $("agentToken").value = localStorage.getItem(LS + "agentToken") || "";
+      $("accountId").value = localStorage.getItem(LS + "accountId") || "";
+      $("prodAppUserId").value =
+        localStorage.getItem(LS + "prodAppUserId") || localStorage.getItem(LS + "authAppUserId") || "";
+      $("authBase").value = localStorage.getItem(LS + "authBase") || "http://127.0.0.1:4052";
+      $("authAppUserId").value = localStorage.getItem(LS + "authAppUserId") || "";
+      $("authSecret").value = localStorage.getItem(LS + "authSecret") || "";
+    }
+
+    function save() {
+      localStorage.setItem(LS + "apiBase", $("apiBase").value.trim());
+      localStorage.setItem(LS + "agentToken", $("agentToken").value);
+      localStorage.setItem(LS + "accountId", $("accountId").value.trim());
+      localStorage.setItem(LS + "prodAppUserId", $("prodAppUserId").value.trim());
+      localStorage.setItem(LS + "authBase", $("authBase").value.trim());
+      localStorage.setItem(LS + "authAppUserId", $("authAppUserId").value.trim());
+      localStorage.setItem(LS + "authSecret", $("authSecret").value);
+    }
+
+    function showBanner(ok, text) {
+      const good = $("bannerOk");
+      const bad = $("bannerErr");
+      good.style.display = "none";
+      bad.style.display = "none";
+      if (text == null || text === "") return;
+      if (ok) {
+        good.textContent = text;
+        good.style.display = "block";
+      } else {
+        bad.textContent = text;
+        bad.style.display = "block";
+      }
+    }
+
+    let authSessionId = null;
+    let selectedDialogId = null;
+
+    function setStatus(el, ok, text) {
+      el.className = "status " + (ok ? "ok" : "err");
+      el.textContent = text;
+    }
+
+    function renderDialogList(items) {
+      const box = $("dialogList");
+      box.innerHTML = "";
+      selectedDialogId = null;
+      if (!items || !items.length) {
+        box.innerHTML = '<p class="note" style="margin:0">Диалогов нет или пустой ответ.</p>';
+        return;
+      }
+      items.forEach((d) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "pick";
+        b.dataset.id = d.id;
+        const title = d.title || d.peerKey || d.id;
+        b.innerHTML = escapeHtml(title) + '<br><span style="font-size:0.75rem;color:var(--muted)">' + escapeHtml(d.id) + "</span>";
+        b.onclick = () => {
+          box.querySelectorAll(".pick").forEach((x) => x.classList.remove("selected"));
+          b.classList.add("selected");
+          $("dialogId").value = d.id;
+          selectedDialogId = d.id;
+          showBanner(true, "Выбран диалог: " + (d.title || d.id));
+        };
+        box.appendChild(b);
+      });
+      $("dialogId").value = items[0].id;
+      items[0] && box.querySelector(".pick")?.classList.add("selected");
+      selectedDialogId = items[0].id;
+    }
+
+    $("btnSave").onclick = () => {
+      save();
+      setStatus($("statusApi"), true, "Сохранено в браузере.");
+      showBanner(true, "Настройки сохранены. Дальше — шаг 2 (appUserId и диалоги).");
+    };
+
+    $("btnHealth").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const pre = $("outHealth");
+      pre.style.display = "block";
+      try {
+        const r = await fetch(base + "/health");
+        const j = await r.json();
+        pre.textContent = JSON.stringify(j, null, 2);
+        setStatus($("statusApi"), true, "API отвечает.");
+        showBanner(true, "Связь с API есть. Можно загружать диалоги.");
+      } catch (e) {
+        pre.textContent = String(e);
+        setStatus($("statusApi"), false, "Не удалось достучаться до API");
+        showBanner(false, "Проверьте адрес API и что сервер запущен (npm run dev).");
+      }
+    };
+
+    $("btnResolveAccount").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const token = $("agentToken").value;
+      const uid = $("prodAppUserId").value.trim();
+      const out = $("outApi");
+      if (!uid) {
+        out.textContent = "Укажите appUserId.";
+        setStatus($("statusDialogs"), false, "Нужен appUserId");
+        showBanner(false, "Введите appUserId (как в connector/.env).");
+        return;
+      }
+      if (!token) {
+        out.textContent = "Укажите AGENT_API_TOKEN.";
+        setStatus($("statusDialogs"), false, "Нужен токен");
+        return;
+      }
+      try {
+        const r = await fetch(base + "/v1/app-users/" + encodeURIComponent(uid) + "/tg-account", {
+          headers: { Authorization: "Bearer " + token },
+        });
+        const t = await r.text();
+        out.textContent = t;
+        if (!r.ok) {
+          setStatus($("statusDialogs"), false, r.status + " " + r.statusText);
+          showBanner(false, "Ошибка: " + r.status);
+          return;
+        }
+        const j = JSON.parse(t);
+        if (j.accountId) {
+          $("accountId").value = j.accountId;
+          localStorage.setItem(LS + "accountId", j.accountId);
+        }
+        setStatus($("statusDialogs"), true, "accountId подставлен — нажмите «Загрузить диалоги»");
+        showBanner(true, "accountId найден. Загрузите диалоги.");
+      } catch (e) {
+        out.textContent = String(e);
+        setStatus($("statusDialogs"), false, "Ошибка сети");
+        showBanner(false, String(e));
+      }
+    };
+
+    $("btnDialogs").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const token = $("agentToken").value;
+      const aid = $("accountId").value.trim();
+      const out = $("outApi");
+      if (!aid) {
+        out.textContent =
+          "Укажите accountId или нажмите «Узнать accountId по appUserId».";
+        setStatus($("statusDialogs"), false, "Нужен accountId");
+        showBanner(false, "Сначала accountId (шаг 2).");
+        return;
+      }
+      if (!token) {
+        out.textContent = "Укажите AGENT_API_TOKEN.";
+        setStatus($("statusDialogs"), false, "Нужен токен");
+        return;
+      }
+      try {
+        const r = await fetch(base + "/v1/accounts/" + encodeURIComponent(aid) + "/dialogs?limit=20", {
+          headers: { Authorization: "Bearer " + token },
+        });
+        const t = await r.text();
+        out.textContent = t;
+        if (!r.ok) {
+          setStatus($("statusDialogs"), false, r.status + " " + r.statusText);
+          showBanner(false, "Ошибка загрузки диалогов: " + r.status);
+          return;
+        }
+        setStatus($("statusDialogs"), true, "Готово — выберите диалог выше");
+        showBanner(true, "Диалоги загружены. Кликните по нужному чату.");
+        try {
+          const j = JSON.parse(t);
+          renderDialogList(j.items || []);
+        } catch (_) {
+          $("dialogList").innerHTML = "";
+        }
+      } catch (e) {
+        out.textContent = String(e);
+        setStatus($("statusDialogs"), false, "Ошибка");
+        showBanner(false, String(e));
+      }
+    };
+
+    $("btnMessages").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const token = $("agentToken").value;
+      const did = $("dialogId").value.trim();
+      const out = $("outMessages");
+      if (!did) {
+        out.textContent = "Выберите диалог (шаг 2) или вставьте dialogId.";
+        return;
+      }
+      try {
+        const r = await fetch(base + "/v1/dialogs/" + encodeURIComponent(did) + "/messages?limit=30", {
+          headers: { Authorization: "Bearer " + token },
+        });
+        out.textContent = await r.text();
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btnSend").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const token = $("agentToken").value;
+      const did = $("dialogId").value.trim();
+      const text = $("sendText").value.trim() || "MVP test " + new Date().toISOString();
+      const out = $("outSend");
+      if (!did) {
+        out.textContent = "Нужен dialogId (шаг 2–3).";
+        return;
+      }
+      try {
+        const r = await fetch(base + "/v1/dialogs/" + encodeURIComponent(did) + "/send", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text }),
+        });
+        out.textContent = await r.text();
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btnSendCode").onclick = async () => {
+      save();
+      const base = $("authBase").value.trim().replace(/\/$/, "");
+      const secret = $("authSecret").value;
+      const phone = $("authPhone").value.trim();
+      const appUserId = $("authAppUserId").value.trim();
+      const out = $("outAuth");
+      $("row2fa").style.display = "none";
+      $("btn2fa").style.display = "none";
+      authSessionId = null;
+      try {
+        const r = await fetch(base + "/auth/send-code", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Connector-Secret": secret,
+          },
+          body: JSON.stringify({ appUserId, phone }),
+        });
+        const j = await r.json();
+        out.textContent = JSON.stringify(j, null, 2);
+        if (r.ok && j.session_id) authSessionId = j.session_id;
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btnVerifyCode").onclick = async () => {
+      const base = $("authBase").value.trim().replace(/\/$/, "");
+      const secret = $("authSecret").value;
+      const code = $("authCode").value.trim();
+      const out = $("outAuth");
+      if (!authSessionId) {
+        out.textContent = "Сначала отправьте код (session_id пустой).";
+        return;
+      }
+      try {
+        const r = await fetch(base + "/auth/verify-code", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Connector-Secret": secret,
+          },
+          body: JSON.stringify({ session_id: authSessionId, code }),
+        });
+        const j = await r.json();
+        out.textContent = JSON.stringify(j, null, 2);
+        if (j.need_2fa) {
+          $("row2fa").style.display = "flex";
+          $("btn2fa").style.display = "inline-block";
+        } else if (j.ok) {
+          authSessionId = null;
+        }
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    function apiHeaders() {
+      return { Authorization: "Bearer " + $("agentToken").value, "Content-Type": "application/json" };
+    }
+
+    $("btnTasksLoad").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const uid = $("prodAppUserId").value.trim();
+      const out = $("outTasks");
+      try {
+        const r = await fetch(base + "/v1/app-users/" + encodeURIComponent(uid) + "/tasks", { headers: apiHeaders() });
+        out.textContent = await r.text();
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btnTaskAdd").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const uid = $("prodAppUserId").value.trim();
+      const title = $("taskTitle").value.trim();
+      const out = $("outTasks");
+      if (!title) {
+        out.textContent = "Введите title";
+        return;
+      }
+      try {
+        const r = await fetch(base + "/v1/app-users/" + encodeURIComponent(uid) + "/tasks", {
+          method: "POST",
+          headers: apiHeaders(),
+          body: JSON.stringify({ title }),
+        });
+        out.textContent = await r.text();
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btnRemLoad").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const uid = $("prodAppUserId").value.trim();
+      const out = $("outRem");
+      try {
+        const r = await fetch(base + "/v1/app-users/" + encodeURIComponent(uid) + "/reminders", { headers: apiHeaders() });
+        out.textContent = await r.text();
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btnRemAdd").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const uid = $("prodAppUserId").value.trim();
+      const aid = $("accountId").value.trim();
+      const title = $("remTitle").value.trim();
+      const text = $("remText").value.trim();
+      const dt = $("remFireAt").value;
+      const out = $("outRem");
+      if (!title || !text || !dt) {
+        out.textContent = "Заполните заголовок, текст и время";
+        return;
+      }
+      const fireAt = new Date(dt).toISOString();
+      const notifyTelegram = $("remTg").checked;
+      const notifyWeb = $("remWeb").checked;
+      const body = { title, text, fireAt, notifyTelegram, notifyWeb };
+      if (notifyTelegram && aid) body.accountId = aid;
+      try {
+        const r = await fetch(base + "/v1/app-users/" + encodeURIComponent(uid) + "/reminders", {
+          method: "POST",
+          headers: apiHeaders(),
+          body: JSON.stringify(body),
+        });
+        out.textContent = await r.text();
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btnWebInbox").onclick = async () => {
+      save();
+      const base = $("apiBase").value.trim();
+      const uid = $("prodAppUserId").value.trim();
+      const out = $("outRem");
+      try {
+        const r = await fetch(base + "/v1/app-users/" + encodeURIComponent(uid) + "/reminders/web-inbox", { headers: apiHeaders() });
+        out.textContent = await r.text();
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    $("btn2fa").onclick = async () => {
+      const base = $("authBase").value.trim().replace(/\/$/, "");
+      const secret = $("authSecret").value;
+      const password = $("authPwd").value;
+      const out = $("outAuth");
+      if (!authSessionId) return;
+      try {
+        const r = await fetch(base + "/auth/verify-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Connector-Secret": secret,
+          },
+          body: JSON.stringify({ session_id: authSessionId, password }),
+        });
+        const j = await r.json();
+        out.textContent = JSON.stringify(j, null, 2);
+        if (j.ok) {
+          authSessionId = null;
+          $("row2fa").style.display = "none";
+          $("btn2fa").style.display = "none";
+        }
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+
+    load();
+    showBanner(true, "Вставьте AGENT_API_TOKEN из telegram-user/.env → «Сохранить», затем шаг 2.");
+  </script>
+</body>
+</html>

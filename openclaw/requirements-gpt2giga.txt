@@ -1,0 +1,2 @@
+# Proxy OpenAI-compatible -> GigaChat (https://github.com/ai-forever/gpt2giga)
+gpt2giga>=0.1.4

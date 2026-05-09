@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Настройка агента — Local OpenClaw</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/landing.css" />
+  <style>
+    .article { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    .article h1 { font-size: 1.35rem; margin: 0 0 0.5rem; }
+    .hint { color: var(--muted); font-size: 0.88rem; margin: 0 0 1rem; }
+    textarea.soul { min-height: 180px; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+    .saved { color: #4ade80; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+  </style>
+</head>
+<body class="page-landing">
+  <header class="topbar">
+    <a class="logo" href="/">Local OpenClaw</a>
+    <nav class="topnav">
+      <a href="/dashboard.html">Кабинет</a>
+      <a href="/docs.html">Документация</a>
+    </nav>
+  </header>
+  <article class="article">
+    <h1>Роль агента (локальный черновик)</h1>
+    <p class="hint">
+      На проде OpenClaw читает файлы вроде <code>SOUL.md</code> из workspace. Здесь текст сохраняется в <strong>localStorage</strong> браузера и подмешивается в системный промпт чата в кабинете — только для быстрых экспериментов.
+    </p>
+    <label for="soul">SOUL.md (стиль и правила)</label>
+    <textarea id="soul" class="soul" placeholder="# Роль&#10;Ты дружелюбный ассистент..."></textarea>
+    <button type="button" class="btn btn-primary" id="save" style="width: auto; margin-top: 0.5rem">Сохранить</button>
+    <p class="saved" id="saved">Сохранено в браузере.</p>
+    <p style="margin-top: 1.5rem"><a href="/dashboard.html">← В кабинет</a></p>
+  </article>
+  <script>
+    const KEY = "local_saas_soul_md";
+    const ta = document.getElementById("soul");
+    ta.value = localStorage.getItem(KEY) || "";
+    document.getElementById("save").onclick = () => {
+      localStorage.setItem(KEY, ta.value);
+      const s = document.getElementById("saved");
+      s.style.display = "block";
+      setTimeout(() => { s.style.display = "none"; }, 2000);
+    };
+  </script>
+</body>
+</html>

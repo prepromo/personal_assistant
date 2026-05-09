@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum ChannelType {
+  telegram
+  whatsapp
+  email
+  max
+}
+
+enum ChannelStatus {
+  disconnected
+  connecting
+  active
+  error
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  canceled
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  passwordHash       String
+  name               String?
+  role               Role      @default(MANAGER)
+  emailVerified      Boolean   @default(false)
+  emailVerificationToken   String?   @unique
+  emailVerificationExpires DateTime?
+  passwordResetToken       String?   @unique
+  passwordResetExpires     DateTime?
+  trialRequestsUsed  Int       @default(0)
+  trialLimit         Int       @default(2)
+  subscriptionActive Boolean   @default(false)
+  yookassaCustomerId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  channels           Channel[]
+  messages           Message[]
+  payments           Payment[]
+}
+
+model Channel {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ChannelType
+  name      String
+  configEnc String        @default("{}") // encrypted JSON (e.g. bot token)
+  status    ChannelStatus @default(disconnected)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  Message[]
+
+  @@index([userId])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId  String
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  externalId String?
+  direction  String   // inbound | outbound
+  body       String
+  meta       String   @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([channelId])
+}
+
+model Payment {
+  id                 String        @id @default(uuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount             String        // decimal as string (YooKassa)
+  currency           String        @default("RUB")
+  yookassaPaymentId  String?       @unique
+  status             PaymentStatus @default(pending)
+  description        String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([userId])
+}

@@ -1,0 +1,20 @@
+{
+  "name": "vpn_service",
+  "version": "1.0.0",
+  "description": "## Цель «день 1» (одна фраза)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "tg-stack": "node scripts/tg-stack.mjs",
+    "tg-stack:no-worker": "node scripts/tg-stack.mjs --no-worker",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

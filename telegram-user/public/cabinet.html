@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Кабинет — Telegram User</title>
+  <style>
+    :root {
+      --bg: #0c1017;
+      --panel: #151b26;
+      --text: #e8edf5;
+      --muted: #8b9aaf;
+      --accent: #3b82f6;
+      --border: #2a3444;
+      --ok: #22c55e;
+      --err: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; }
+    a { color: var(--accent); }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--panel);
+    }
+    h1 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+    .row-main { display: grid; grid-template-columns: 280px 1fr; gap: 0; min-height: 42vh; }
+    @media (max-width: 800px) { .row-main { grid-template-columns: 1fr; } aside { border-bottom: 1px solid var(--border); } }
+    aside { border-right: 1px solid var(--border); padding: 1rem; overflow: auto; max-height: 50vh; }
+    section.content { padding: 1rem; overflow: auto; }
+    .assistant-panel {
+      border-top: 1px solid var(--border); padding: 1rem; background: var(--panel);
+      min-height: 220px;
+    }
+    #chatOut { max-height: 240px; overflow: auto; margin-bottom: 0.5rem; }
+    .chat-bubble { padding: 0.45rem 0.6rem; border-radius: 8px; margin: 0.35rem 0; max-width: 92%; font-size: 0.85rem; }
+    .chat-bubble.user { background: #1e3a5f; margin-left: auto; }
+    .chat-bubble.assistant { background: #1a2332; border: 1px solid var(--border); }
+    .note { color: var(--muted); font-size: 0.85rem; margin: 0 0 1rem; }
+    label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input, select, button, textarea {
+      width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 0.9rem; margin-bottom: 0.6rem;
+    }
+    button {
+      background: var(--accent); color: #fff; border: none; cursor: pointer; font-weight: 500;
+    }
+    button.secondary { background: #374151; }
+    button:disabled { opacity: 0.5; }
+    .dlg-item {
+      display: flex; align-items: flex-start; gap: 0.35rem;
+      padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; margin-bottom: 0.35rem;
+      border: 1px solid transparent;
+    }
+    .dlg-cb { flex-shrink: 0; margin-top: 0.15rem; cursor: pointer; }
+    .dlg-item-inner { flex: 1; min-width: 0; }
+    .dlg-item:hover { background: #1a2230; }
+    .dlg-item.active { border-color: var(--accent); background: #1a2435; }
+    .dlg-title { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dlg-meta { font-size: 0.7rem; color: var(--muted); }
+    pre.msg {
+      font-size: 0.8rem; padding: 0.5rem; margin: 0.35rem 0; border-radius: 6px;
+      background: #0e1520; border: 1px solid var(--border); white-space: pre-wrap;
+    }
+    .out { border-left: 3px solid var(--accent); }
+    .in { border-left: 3px solid #64748b; }
+    .status-ok { color: var(--ok); }
+    .status-err { color: var(--err); }
+    #authPanel { max-width: 440px; margin: 2rem auto; padding: 1.5rem; background: var(--panel); border-radius: 10px; border: 1px solid var(--border); }
+    .howto {
+      max-width: 520px; margin: 1rem auto 0; padding: 1rem 1.25rem; background: var(--panel);
+      border-radius: 10px; border: 1px solid var(--border); font-size: 0.88rem; line-height: 1.45;
+    }
+    .howto h2 { font-size: 1rem; margin: 0 0 0.6rem; font-weight: 600; }
+    .howto ol { margin: 0.35rem 0 0; padding-left: 1.2rem; }
+    .howto li { margin-bottom: 0.45rem; }
+    .howto code { font-size: 0.82em; }
+    .flow-card {
+      margin: 1rem 1.25rem 0;
+      padding: 1rem 1.25rem;
+      background: #121923;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-width: 960px;
+    }
+    .flow-card h2 { font-size: 1rem; margin: 0 0 0.75rem; font-weight: 600; }
+    .flow-step {
+      margin-bottom: 0.65rem;
+      padding: 0.5rem 0 0.5rem 0.85rem;
+      border-left: 3px solid var(--border);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+    .flow-step.done { border-left-color: var(--ok); }
+    .flow-step.current { border-left-color: var(--accent); }
+    .flow-step .tag { font-size: 0.72rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.04em; }
+    .flow-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.35rem; }
+    .flow-actions button { width: auto; min-width: 140px; }
+    #authPanel h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    details.advanced-reg { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+    details.advanced-reg summary { cursor: pointer; color: var(--muted); font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Личный кабинет</h1>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <a href="/" style="font-size:0.9rem">На главную (лендинг)</a>
+      <div id="headerUser"></div>
+    </div>
+  </header>
+
+  <div class="howto">
+    <h2>Три шага до полного доступа</h2>
+    <ol>
+      <li><strong>Сайт — регистрация.</strong> Email и пароль (ниже) или «Вход через Telegram». Система сама выдаёт <code>appUserId</code> — его не нужно искать заранее.</li>
+      <li><strong>Сайт — оплата.</strong> Помесячный тариф; после подключения ЮKassa оплата пойдёт через платёжную форму. На стенде — тестовая кнопка, если на API задано <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>.</li>
+      <li><strong>Личный Telegram.</strong> После оплаты в кабинете (блок ниже) или в боте: номер в формате <code>+7…</code> → код из Telegram → при необходимости пароль 2FA. На сервере должен работать <strong>worker</strong> — тогда появятся диалоги и автоответы.</li>
+    </ol>
+    <p class="note" style="margin-bottom:0">Док: <a href="/docs/USER-TURN.md" target="_blank" rel="noopener">USER-TURN</a>, <a href="/docs/AUTOMATION.md" target="_blank" rel="noopener">AUTOMATION</a>. В @BotFather: <code>/setdomain</code> для виджета входа.</p>
+  </div>
+
+  <div id="authPanel">
+    <h2>Шаг 1 — регистрация</h2>
+    <p class="note" style="margin-top:0">Сначала аккаунт на сайте, затем оплата (шаг 2), затем подключение личного Telegram в кабинете или в боте (шаг 3).</p>
+    <p class="note" style="text-align:center;margin-bottom:0.75rem"><strong>Вход через Telegram</strong> — подтверждение в приложении, без пароля.</p>
+    <div id="telegram-widget-mount" style="display:flex;justify-content:center;min-height:52px;margin-bottom:1rem"></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0" />
+    <p class="note" style="margin-bottom:0.5rem"><strong>Регистрация по email</strong> — создаётся <code>appUserId</code> автоматически, коннектор подключаете после оплаты.</p>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username" />
+    <label>Пароль (мин. 8)</label>
+    <input id="password" type="password" autocomplete="new-password" />
+    <button type="button" id="btnRegisterWeb">Создать аккаунт</button>
+    <button type="button" class="secondary" id="btnLogin">Уже есть аккаунт — войти</button>
+    <details class="advanced-reg">
+      <summary>Расширенно: у меня уже есть appUserId из коннектора</summary>
+      <p class="note" style="margin-top:0.75rem">Если <code>TgAccount</code> уже создан через <code>ensure-account</code>, можно привязать кабинет к этому id.</p>
+      <label>appUserId</label>
+      <input id="regAppUserId" type="text" placeholder="user-..." />
+      <button type="button" id="btnRegister">Регистрация с этим appUserId</button>
+      <p class="note"><a href="#" id="lnkOidc">Вход через OIDC</a> (нужны OIDC_* в .env; appUserId — из поля выше)</p>
+    </details>
+    <p id="authErr" class="status-err"></p>
+  </div>
+
+  <main id="appMain" style="display: none;">
+    <div id="flowCard" class="flow-card" aria-live="polite"></div>
+    <div class="row-main">
+    <aside>
+      <p class="note" id="tgStatus"></p>
+      <div id="mtprotoPanel" style="display:none;border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin:0.75rem 0;background:#0e1520;">
+        <strong style="font-size:0.95rem;">Личный Telegram</strong>
+        <p class="note" style="margin-top:0.35rem">Подключение как в обычном входе: номер <code>+7…</code> → код в Telegram → при необходимости пароль 2FA. Нужны <code>TELEGRAM_API_ID</code> / <code>TELEGRAM_API_HASH</code> в <code>connector/.env</code> на сервере.</p>
+        <label>Телефон</label>
+        <input id="mtpPhone" type="tel" placeholder="+79991234567" autocomplete="tel" />
+        <button type="button" id="btnMtpSendCode" style="margin-top:0.35rem">Отправить код</button>
+        <label style="margin-top:0.5rem">Код из Telegram</label>
+        <input id="mtpCode" inputmode="numeric" placeholder="12345" autocomplete="one-time-code" />
+        <button type="button" id="btnMtpSignIn" style="margin-top:0.35rem">Подтвердить код</button>
+        <div id="mtpPwdBlock" style="display:none;margin-top:0.5rem">
+          <label>Пароль 2FA Telegram</label>
+          <input id="mtpPwd" type="password" autocomplete="current-password" />
+          <button type="button" id="btnMtpPwd" style="margin-top:0.35rem">Подтвердить пароль</button>
+        </div>
+        <p id="mtpStatus" class="note" style="margin-top:0.5rem;min-height:1rem"></p>
+      </div>
+      <label>Режим автоответа с личного аккаунта</label>
+      <select id="replyMode">
+        <option value="manual">manual — только вручную (кнопка «Отправить»)</option>
+        <option value="suggest">suggest — LLM → текст в аудит, в Telegram не шлём</option>
+        <option value="auto">auto — LLM → очередь worker, сообщение от вашего имени</option>
+      </select>
+      <p class="note" style="font-size:0.78rem;line-height:1.35">
+        Нужны запущенные <strong>API 4050</strong>, <strong>connector worker</strong>, <strong>OPENCLAW_*</strong> (или OpenAI) в <code>.env</code>.
+        Сначала <strong>suggest</strong>, затем <strong>auto</strong>. Док: <a href="/docs/AUTOMATION.md" target="_blank" rel="noopener">AUTOMATION</a>
+      </p>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;cursor:pointer;margin-bottom:0.5rem">
+        <input type="checkbox" id="autoInGroups" />
+        Автоответы в группах/каналах (иначе только личка; в группах часто ошибка <code>CHAT_ADMIN_REQUIRED</code>)
+      </label>
+      <label>Доступ агента (HTTP API с токеном)</label>
+      <select id="agentScope">
+        <option value="all">все чаты аккаунта</option>
+        <option value="allowlist">только выбранные ниже</option>
+      </select>
+      <p class="note" style="font-size:0.78rem;line-height:1.35">
+        В режиме списка отметьте чекбоксы у чатов и нажмите «Сохранить список». Кабинет и ручная отправка не ограничиваются.
+      </p>
+      <button type="button" id="btnSavePolicy">Сохранить политику</button>
+      <button type="button" class="secondary" id="btnSaveAgentChats">Сохранить список для агента</button>
+      <p id="policySaveStatus" class="note" style="min-height:1rem"></p>
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;" />
+      <strong>Диалоги</strong>
+      <p class="note">Обновление каждые 15 с + по кнопке</p>
+      <button type="button" class="secondary" id="btnRefreshDialogs">Обновить</button>
+      <div id="dialogList"></div>
+    </aside>
+    <section class="content">
+      <h2 style="margin-top: 0; font-size: 1rem;">Сообщения</h2>
+      <p class="note" id="dialogHint">Выберите диалог слева</p>
+      <div id="messagesOut"></div>
+      <label>Отправить (очередь → worker)</label>
+      <textarea id="sendText" rows="2" placeholder="Текст…"></textarea>
+      <button type="button" id="btnSend" disabled>Отправить</button>
+      <p id="sendStatus"></p>
+    </section>
+    </div>
+    <section class="assistant-panel">
+      <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">Чат с ассистентом (LLM)</h2>
+      <p class="note">Нужны OPENCLAW_GATEWAY_URL + OPENCLAW_GATEWAY_TOKEN или OPENAI_BASE_URL + OPENAI_API_KEY на сервере.</p>
+      <div id="chatOut"></div>
+      <textarea id="chatInput" rows="2" placeholder="Сообщение ассистенту…"></textarea>
+      <button type="button" id="btnChatSend">Отправить</button>
+      <p id="chatStatus" class="note"></p>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function apiHeaders() {
+      const h = { "Content-Type": "application/json" };
+      const t = sessionStorage.getItem("cabinet_token");
+      if (t) h["Authorization"] = "Bearer " + t;
+      return h;
+    }
+    const api = (path, opts = {}) =>
+      fetch(path, {
+        credentials: "include",
+        headers: { ...apiHeaders(), ...(opts.headers || {}) },
+        ...opts,
+      });
+
+    let pollTimer = null;
+    let selectedDialogId = null;
+    let lastDialogItems = [];
+    const allowedDialogIds = new Set();
+
+    async function loadAgentAllowed() {
+      const r = await api("/api/v1/cabinet/agent-allowed-dialogs");
+      if (r.status === 402) return;
+      if (!r.ok) return;
+      const j = await r.json();
+      allowedDialogIds.clear();
+      (j.items || []).forEach((x) => allowedDialogIds.add(x.dialogId));
+      if ($("agentScope") && j.agentScope) $("agentScope").value = j.agentScope;
+    }
+
+    async function loadMe() {
+      const r = await api("/api/v1/auth/me");
+      if (!r.ok) return null;
+      return r.json();
+    }
+
+    function showApp() {
+      $("authPanel").style.display = "none";
+      const m = $("appMain");
+      m.style.display = "flex";
+      m.style.flexDirection = "column";
+    }
+
+    function escHtml(s) {
+      return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+
+    async function renderFlowCard(data) {
+      const fc = $("flowCard");
+      if (!fc || !data) return;
+      let boot = {};
+      try {
+        const r = await fetch("/api/v1/auth/bootstrap-public");
+        boot = await r.json();
+      } catch (_) {}
+      const botName = boot.telegramBotUsername || "";
+      const botHref = botName ? "https://t.me/" + String(botName).replace(/[^\w]/g, "") : "";
+      const sub = data.subscription || {};
+      const ob = data.onboarding || {};
+      const bill = data.billing || {};
+      const paid = !!sub.paid;
+      const s1 = "done";
+      const s2 = paid ? "done" : "current";
+      const s3 = ob.step3_telegramMtprotoDone ? "done" : paid ? "current" : "";
+      const nextPay = sub.nextPaymentDueAt || sub.currentPeriodEnd
+        ? "<br/><span class=\"note\">Следующее списание (помесячно): <strong>" +
+          escHtml(sub.nextPaymentDueAt || sub.currentPeriodEnd) +
+          "</strong></span>"
+        : "";
+      let payBlock = "";
+      if (!paid) {
+        if (bill.simulatedPaymentAvailable && !bill.yookassaConfigured) {
+          payBlock =
+            '<div class="flow-actions"><button type="button" id="btnPayMonthlyFlow">Оплатить месяц (тест)</button></div><p class="note" style="margin:0.35rem 0 0">На проде подключите ЮKassa и отключите тестовую оплату.</p>';
+        } else if (bill.yookassaConfigured) {
+          payBlock =
+            '<p class="note" style="margin:0">Онлайн-оплата подключается (ЮKassa). Пока обратитесь к администратору или отключите <code>YOOKASSA_SHOP_ID</code> на стенде и задайте <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>.</p>';
+        } else {
+          payBlock =
+            '<p class="note" style="margin:0">Чтобы протестировать оплату без ЮKassa, на сервере API задайте <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>.</p>';
+        }
+      } else {
+        payBlock = '<p class="status-ok" style="margin:0">Оплачено.' + nextPay + "</p>";
+      }
+      const step3txt = ob.step3_telegramMtprotoDone
+        ? "Личный Telegram подключён. Запустите worker на сервере — подтянутся диалоги."
+        : "В блоке <strong>«Личный Telegram»</strong> слева введите номер и код (или откройте бота" +
+          (botHref
+            ? ': <a href="' + botHref + '" target="_blank" rel="noopener">@' + escHtml(botName) + "</a>"
+            : "") +
+          " — там тот же сценарий). Worker на сервере обязателен для синхронизации. Тех. id:";
+      fc.innerHTML =
+        "<h2>Статус: аккаунт и тариф</h2>" +
+        '<div class="flow-step done"><span class="tag">Шаг 1</span><br/><strong>Регистрация</strong> — ' +
+        escHtml(data.user.email) +
+        "</div>" +
+        '<div class="flow-step ' +
+        s2 +
+        '"><span class="tag">Шаг 2</span><br/><strong>Оплата</strong> (помесячный тариф)' +
+        payBlock +
+        "</div>" +
+        '<div class="flow-step ' +
+        (s3 || (paid ? "current" : "")) +
+        '"><span class="tag">Шаг 3</span><br/><strong>Контакты и личный Telegram</strong><br/>' +
+        step3txt +
+        '</div><div class="flow-actions" style="margin-top:0.5rem"><code id="flowAppUserId" style="font-size:0.8rem;word-break:break-all;flex:1;min-width:200px;padding:0.35rem 0.5rem;background:#0e1520;border-radius:6px;border:1px solid var(--border)">' +
+        escHtml(data.user.appUserId) +
+        '</code><button type="button" class="secondary" id="btnCopyAppUserId">Копировать appUserId</button></div>';
+      const payBtn = document.getElementById("btnPayMonthlyFlow");
+      if (payBtn) {
+        payBtn.onclick = async () => {
+          payBtn.disabled = true;
+          const r = await api("/api/v1/cabinet/billing/complete-monthly", {
+            method: "POST",
+            body: "{}",
+          });
+          const t = await r.text();
+          payBtn.disabled = false;
+          if (!r.ok) {
+            alert(t);
+            return;
+          }
+          const fresh = await loadMe();
+          if (fresh) await applyLoggedInUi(fresh);
+        };
+      }
+      const copyBtn = document.getElementById("btnCopyAppUserId");
+      if (copyBtn && data.user.appUserId) {
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(data.user.appUserId).then(
+            () => {
+              copyBtn.textContent = "Скопировано";
+              setTimeout(() => (copyBtn.textContent = "Копировать appUserId"), 2000);
+            },
+            () => alert("Не удалось скопировать")
+          );
+        };
+      }
+    }
+
+    async function syncMtprotoPanel() {
+      const panel = $("mtprotoPanel");
+      const pwdBlock = $("mtpPwdBlock");
+      const st = $("mtpStatus");
+      if (!panel || !pwdBlock || !st) return;
+      pwdBlock.style.display = "none";
+      $("mtpPwd").value = "";
+      st.textContent = "";
+      const r = await api("/api/v1/cabinet/mtproto/status");
+      if (!r.ok) {
+        panel.style.display = "none";
+        return;
+      }
+      const j = await r.json();
+      if (!j.paid || !j.needsLogin) {
+        panel.style.display = "none";
+        return;
+      }
+      panel.style.display = "block";
+      st.textContent = "Введите номер в формате +7… и подтвердите код из Telegram.";
+    }
+
+    function bindMtprotoHandlers() {
+      const st = $("mtpStatus");
+      const pwdBlock = $("mtpPwdBlock");
+      const btnSend = $("btnMtpSendCode");
+      const btnCode = $("btnMtpSignIn");
+      const btnPwd = $("btnMtpPwd");
+      if (!btnSend || !btnCode || !btnPwd) return;
+      btnSend.onclick = async () => {
+        const phone = ($("mtpPhone").value || "").trim().replace(/\s/g, "");
+        st.textContent = "Отправка…";
+        pwdBlock.style.display = "none";
+        const r = await api("/api/v1/cabinet/mtproto/login/start", {
+          method: "POST",
+          body: JSON.stringify({ phone }),
+        });
+        const raw = await r.text();
+        if (!r.ok) {
+          st.textContent = raw;
+          return;
+        }
+        try {
+          const j = JSON.parse(raw);
+          st.textContent = j.message || "Код отправлен";
+        } catch (_) {
+          st.textContent = raw;
+        }
+      };
+      btnCode.onclick = async () => {
+        const code = ($("mtpCode").value || "").trim().replace(/\s/g, "");
+        st.textContent = "Проверка…";
+        const r = await api("/api/v1/cabinet/mtproto/login/confirm", {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        });
+        const raw = await r.text();
+        if (!r.ok) {
+          st.textContent = raw;
+          return;
+        }
+        let j = {};
+        try {
+          j = JSON.parse(raw);
+        } catch (_) {}
+        if (j.needPassword) {
+          pwdBlock.style.display = "block";
+          st.textContent = j.message || "Введите пароль 2FA";
+          return;
+        }
+        st.textContent = j.message || "Готово";
+        await refreshHeader();
+      };
+      btnPwd.onclick = async () => {
+        const password = ($("mtpPwd").value || "").trim();
+        st.textContent = "Проверка пароля…";
+        const r = await api("/api/v1/cabinet/mtproto/login/password", {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        });
+        const raw = await r.text();
+        if (!r.ok) {
+          st.textContent = raw;
+          return;
+        }
+        try {
+          const j = JSON.parse(raw);
+          st.textContent = j.message || "Готово";
+        } catch (_) {
+          st.textContent = raw;
+        }
+        pwdBlock.style.display = "none";
+        await refreshHeader();
+      };
+    }
+
+    async function applyLoggedInUi(data) {
+      showApp();
+      $("headerUser").innerHTML =
+        '<span>' +
+        escHtml(data.user.email) +
+        '</span> &nbsp; <button type="button" class="secondary" id="btnLogout">Выход</button>';
+      document.getElementById("btnLogout").onclick = async () => {
+        sessionStorage.removeItem("cabinet_token");
+        await api("/api/v1/auth/logout", { method: "POST" });
+        location.reload();
+      };
+      const st = data.telegram;
+      $("tgStatus").innerHTML = st
+        ? "Telegram: <span class=\"status-ok\">" +
+          escHtml(st.status) +
+          "</span> · account <code style=\"font-size:0.7rem\">" +
+          escHtml(st.accountId) +
+          "</code>"
+        : "<span class=\"status-err\">Нет TgAccount</span>";
+      await renderFlowCard(data);
+      await syncMtprotoPanel();
+      bindMtprotoHandlers();
+      await loadTelegramPolicy();
+      await fetchDialogs();
+      loadChat();
+      startPoll();
+    }
+
+    function showAuth() {
+      $("authPanel").style.display = "block";
+      $("appMain").style.display = "none";
+    }
+
+    async function refreshHeader() {
+      const data = await loadMe();
+      if (!data) {
+        showAuth();
+        return;
+      }
+      await applyLoggedInUi(data);
+    }
+
+    async function loadTelegramPolicy() {
+      const r = await api("/api/v1/cabinet/telegram");
+      if (!r.ok) return;
+      const j = await r.json();
+      if (j.policy && j.policy.replyMode) $("replyMode").value = j.policy.replyMode;
+      $("autoInGroups").checked = !!(j.policy && j.policy.autoInGroups);
+      if ($("agentScope")) $("agentScope").value = (j.policy && j.policy.agentScope) || "all";
+    }
+
+    $("btnSavePolicy").onclick = async () => {
+      const replyMode = $("replyMode").value;
+      const autoInGroups = $("autoInGroups").checked;
+      const agentScope = $("agentScope").value;
+      $("policySaveStatus").textContent = "Сохранение…";
+      const r = await api("/api/v1/cabinet/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ replyMode, autoInGroups, agentScope }),
+      });
+      if (!r.ok) {
+        $("policySaveStatus").textContent = "";
+        alert(await r.text());
+        return;
+      }
+      await loadAgentAllowed();
+      renderDialogs(lastDialogItems);
+      $("policySaveStatus").innerHTML =
+        '<span class="status-ok">Сохранено: ' +
+        replyMode +
+        (autoInGroups ? " + группы" : " (только личка)") +
+        " · агент: " +
+        (agentScope === "allowlist" ? "список" : "все") +
+        "</span>";
+    };
+
+    $("btnSaveAgentChats").onclick = async () => {
+      $("policySaveStatus").textContent = "Сохранение списка…";
+      const ids = [];
+      document.querySelectorAll(".dlg-agent-cb:checked").forEach((c) =>
+        ids.push(c.getAttribute("data-did"))
+      );
+      const r = await api("/api/v1/cabinet/agent-allowed-dialogs", {
+        method: "PUT",
+        body: JSON.stringify({ dialogIds: ids }),
+      });
+      if (!r.ok) {
+        $("policySaveStatus").textContent = "";
+        alert(await r.text());
+        return;
+      }
+      await loadAgentAllowed();
+      renderDialogs(lastDialogItems);
+      $("policySaveStatus").innerHTML =
+        '<span class="status-ok">Список для агента: ' + ids.length + " чат(ов)</span>";
+    };
+
+    $("agentScope").onchange = () => renderDialogs(lastDialogItems);
+
+    function renderDialogs(items) {
+      lastDialogItems = items || [];
+      const scope = $("agentScope") ? $("agentScope").value : "all";
+      const el = $("dialogList");
+      el.innerHTML = lastDialogItems
+        .map((d) => {
+          const cb =
+            scope === "allowlist"
+              ? '<label class="dlg-cb" onclick="event.stopPropagation()"><input type="checkbox" class="dlg-agent-cb" data-did="' +
+                d.id +
+                '"' +
+                (allowedDialogIds.has(d.id) ? " checked" : "") +
+                " /></label>"
+              : "";
+          return (
+            '<div class="dlg-item' +
+            (d.id === selectedDialogId ? " active" : "") +
+            '" data-id="' +
+            d.id +
+            '">' +
+            cb +
+            '<div class="dlg-item-inner"><div class="dlg-title">' +
+            (d.title || d.peerKey) +
+            '</div><div class="dlg-meta">' +
+            d.dialogType +
+            " · " +
+            (d.lastSyncedAt || "") +
+            "</div></div></div>"
+          );
+        })
+        .join("");
+      el.querySelectorAll(".dlg-item").forEach((node) => {
+        node.onclick = () => {
+          selectedDialogId = node.getAttribute("data-id");
+          el.querySelectorAll(".dlg-item").forEach((n) => n.classList.remove("active"));
+          node.classList.add("active");
+          loadMessages();
+        };
+      });
+    }
+
+    async function fetchDialogs() {
+      await loadAgentAllowed();
+      const r = await api("/api/v1/cabinet/dialogs?limit=80");
+      if (r.status === 402) {
+        $("dialogHint").textContent =
+          "Диалоги доступны после оплаты (шаг 2) и подключения личного Telegram (шаг 3). См. блок статуса выше.";
+        renderDialogs([]);
+        return;
+      }
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!selectedDialogId) $("dialogHint").textContent = "Выберите диалог слева";
+      renderDialogs(j.items || []);
+    }
+
+    async function loadMessages() {
+      if (!selectedDialogId) return;
+      $("dialogHint").textContent = "Загрузка…";
+      const r = await api("/api/v1/cabinet/dialogs/" + encodeURIComponent(selectedDialogId) + "/messages?limit=80");
+      if (!r.ok) {
+        $("dialogHint").textContent = "Ошибка загрузки";
+        return;
+      }
+      const j = await r.json();
+      $("dialogHint").textContent = "";
+      $("messagesOut").innerHTML = (j.items || [])
+        .map(
+          (m) =>
+            '<pre class="msg ' +
+            (m.out ? "out" : "in") +
+            '">' +
+            (m.out ? "→ " : "← ") +
+            (m.text || "") +
+            "\n<small style=\"color:#64748b\">" +
+            m.date +
+            " · id " +
+            m.tgMessageId +
+            "</small></pre>"
+        )
+        .join("");
+      $("btnSend").disabled = false;
+    }
+
+    $("btnRefreshDialogs").onclick = () => fetchDialogs();
+
+    $("btnSend").onclick = async () => {
+      const text = $("sendText").value.trim();
+      if (!text || !selectedDialogId) return;
+      $("sendStatus").textContent = "Отправка…";
+      const r = await api("/api/v1/cabinet/dialogs/" + encodeURIComponent(selectedDialogId) + "/send", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+      $("sendStatus").textContent = r.ok ? "В очереди (worker)" : await r.text();
+      if (r.ok) $("sendText").value = "";
+      setTimeout(loadMessages, 2000);
+    };
+
+    $("lnkOidc").onclick = (e) => {
+      e.preventDefault();
+      const id = $("regAppUserId").value.trim();
+      if (!id) {
+        alert("Укажите appUserId");
+        return;
+      }
+      location.href = "/api/v1/auth/oidc/start?appUserId=" + encodeURIComponent(id);
+    };
+
+    $("btnChatSend").onclick = async () => {
+      const text = $("chatInput").value.trim();
+      if (!text) return;
+      $("chatStatus").textContent = "…";
+      const r = await api("/api/v1/cabinet/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+      const t = await r.text();
+      if (!r.ok) {
+        $("chatStatus").textContent = t;
+        return;
+      }
+      $("chatInput").value = "";
+      $("chatStatus").textContent = "OK";
+      loadChat();
+    };
+
+    async function loadChat() {
+      const r = await api("/api/v1/cabinet/chat/messages?limit=40");
+      if (r.status === 402) {
+        $("chatOut").innerHTML =
+          '<p class="note">Чат с ассистентом доступен после оплаты подписки (шаг 2 в блоке статуса выше).</p>';
+        return;
+      }
+      if (!r.ok) return;
+      const j = await r.json();
+      $("chatOut").innerHTML = (j.items || [])
+        .map(
+          (m) =>
+            '<div class="chat-bubble ' +
+            m.role +
+            '"><strong>' +
+            m.role +
+            "</strong><br/>" +
+            (m.content || "").replace(/</g, "&lt;") +
+            "</div>"
+        )
+        .join("");
+    }
+
+    function showAuthError(raw) {
+      let msg = raw;
+      try {
+        const j = JSON.parse(raw);
+        if (j && typeof j.error === "string") msg = j.error;
+      } catch (_) {}
+      $("authErr").textContent = msg;
+    }
+
+    $("btnRegisterWeb").onclick = async () => {
+      $("authErr").textContent = "";
+      const body = {
+        email: $("email").value.trim(),
+        password: $("password").value,
+      };
+      const r = await api("/api/v1/auth/register-web", { method: "POST", body: JSON.stringify(body) });
+      const t = await r.text();
+      if (!r.ok) {
+        showAuthError(t);
+        return;
+      }
+      try {
+        const j = JSON.parse(t);
+        if (j.token) sessionStorage.setItem("cabinet_token", j.token);
+      } catch (_) {}
+      const data = await loadMe();
+      if (data) await applyLoggedInUi(data);
+    };
+
+    $("btnRegister").onclick = async () => {
+      $("authErr").textContent = "";
+      const body = {
+        email: $("email").value.trim(),
+        password: $("password").value,
+        appUserId: $("regAppUserId").value.trim(),
+      };
+      if (/^bot-\d+$/.test(body.appUserId)) {
+        $("authErr").textContent =
+          "Строка bot-… не подходит для регистрации. Сначала connector: ensure-account + login.py и привязка аккаунта к Telegram (README). Потом снова «Личный кабинет» в боте — скопируйте постоянный appUserId.";
+        return;
+      }
+      const r = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify(body) });
+      const t = await r.text();
+      if (!r.ok) {
+        showAuthError(t);
+        return;
+      }
+      try {
+        const j = JSON.parse(t);
+        if (j.token) sessionStorage.setItem("cabinet_token", j.token);
+      } catch (_) {}
+      const data = await loadMe();
+      if (data) await applyLoggedInUi(data);
+    };
+
+    $("btnLogin").onclick = async () => {
+      $("authErr").textContent = "";
+      const body = {
+        email: $("email").value.trim(),
+        password: $("password").value,
+      };
+      const r = await api("/api/v1/auth/login", { method: "POST", body: JSON.stringify(body) });
+      const t = await r.text();
+      if (!r.ok) {
+        showAuthError(t);
+        return;
+      }
+      try {
+        const j = JSON.parse(t);
+        if (j.token) sessionStorage.setItem("cabinet_token", j.token);
+      } catch (_) {}
+      const data = await loadMe();
+      if (data) await applyLoggedInUi(data);
+    };
+
+    function startPoll() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        fetchDialogs();
+        if (selectedDialogId) loadMessages();
+        loadChat();
+      }, 15000);
+    }
+
+    async function mountTelegramLoginWidget() {
+      const m = $("telegram-widget-mount");
+      if (!m) return;
+      try {
+        const r = await fetch("/api/v1/auth/bootstrap-public");
+        const j = await r.json();
+        if (!j.telegramLoginAvailable || !j.telegramBotUsername) {
+          m.innerHTML =
+            '<p class="note" style="text-align:center">Виджет Telegram: задайте в .env API <code>PRODUCT_BOT_USERNAME</code> (имя бота без @) и <code>PRODUCT_BOT_TOKEN</code>.</p>';
+          return;
+        }
+        const s = document.createElement("script");
+        s.src = "https://telegram.org/js/telegram-widget.js?22";
+        s.async = true;
+        s.setAttribute("data-telegram-login", j.telegramBotUsername);
+        s.setAttribute("data-size", "large");
+        s.setAttribute("data-auth-url", location.origin + "/api/v1/auth/telegram-callback");
+        m.appendChild(s);
+      } catch {
+        m.textContent = "Не удалось загрузить виджет входа.";
+      }
+    }
+
+    (async () => {
+      const usp = new URLSearchParams(location.search);
+      const te = usp.get("tg_err");
+      if (te) $("authErr").textContent = "Вход через Telegram: " + te;
+      if (usp.get("tg_ok")) {
+        try {
+          history.replaceState({}, "", location.pathname);
+        } catch (_) {}
+      }
+      const data = await loadMe();
+      if (data && data.user) {
+        await applyLoggedInUi(data);
+      } else {
+        showAuth();
+        await mountTelegramLoginWidget();
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Кабинет — Local OpenClaw</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/landing.css" />
+  <style>
+    .dash-main { max-width: 800px; margin: 0 auto; padding: 1rem 1.25rem 2.5rem; }
+    .chat-log {
+      min-height: 140px;
+      max-height: 340px;
+      overflow-y: auto;
+      margin-bottom: 0.75rem;
+    }
+    .msg { margin-bottom: 0.5rem; font-size: 0.9rem; }
+    .msg .role { color: var(--muted); font-size: 0.75rem; }
+    textarea#input { min-height: 88px; font-family: inherit; }
+    .row2 { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; margin-bottom: 0.75rem; }
+    .row2 > div { flex: 1; min-width: 160px; }
+    select { width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+    .provider-openclaw[disabled] { opacity: 0.45; }
+    button.row-btn { width: auto; }
+  </style>
+</head>
+<body class="page-landing">
+  <header class="topbar">
+    <a class="logo" href="/">Local OpenClaw</a>
+    <nav class="topnav">
+      <a href="/">Главная</a>
+      <a href="/channels.html">Каналы</a>
+      <a href="/agent.html">Агент</a>
+      <a href="/subscription.html">Тарифы</a>
+      <a href="/status.html">Статус</a>
+      <span id="who" style="color: var(--muted); font-size: 0.85rem"></span>
+      <a href="#" id="logout">Выйти</a>
+    </nav>
+  </header>
+
+  <main class="dash-main">
+    <h1>Кабинет · чат</h1>
+    <p class="lead">
+      Провайдер <strong>gpt2giga</strong> — прямой GigaChat. Провайдер <strong>OpenClaw</strong> — запрос к gateway (агент, инструменты), если заданы переменные в <code>local-saas/.env</code>.
+    </p>
+
+    <div class="card">
+      <div class="row2">
+        <div>
+          <label>Провайдер</label>
+          <select id="provider">
+            <option value="gpt2giga">GigaChat (gpt2giga)</option>
+            <option value="openclaw" id="optOpenclaw">OpenClaw gateway</option>
+          </select>
+        </div>
+        <div id="wrapModel">
+          <label>Модель (gpt2giga)</label>
+          <select id="model"></select>
+        </div>
+      </div>
+      <p class="err" id="err" style="display:none"></p>
+      <div class="chat-log" id="log"></div>
+      <label>Сообщение</label>
+      <textarea id="input" placeholder="Спросите что угодно"></textarea>
+      <button type="button" id="send">Отправить</button>
+      <button type="button" class="secondary" id="clear">Очистить историю</button>
+      <p class="lead" style="margin-top:1rem;margin-bottom:0">Ответ API (отладка):</p>
+      <pre class="out" id="raw"></pre>
+    </div>
+  </main>
+
+  <script>
+    const SOUL_KEY = "local_saas_soul_md";
+    const logEl = document.getElementById("log");
+    const rawEl = document.getElementById("raw");
+    const providerEl = document.getElementById("provider");
+    const modelEl = document.getElementById("model");
+    const wrapModel = document.getElementById("wrapModel");
+
+    function systemPrompt() {
+      const soul = localStorage.getItem(SOUL_KEY) || "";
+      const base = "Ты полезный ассистент. Отвечай по-русски.";
+      if (!soul.trim()) return base;
+      return base + "\n\n--- Правила пользователя (agent.html) ---\n" + soul;
+    }
+
+    let history = [{ role: "system", content: systemPrompt() }];
+
+    async function loadConfig() {
+      const r = await fetch("/api/config", { credentials: "same-origin" });
+      const cfg = await r.json();
+      const oc = cfg.openclaw;
+      const opt = document.getElementById("optOpenclaw");
+      if (!oc) {
+        opt.disabled = true;
+        opt.textContent = "OpenClaw gateway (не настроен в .env)";
+      }
+    }
+
+    async function loadModels() {
+      const r = await fetch("/api/models", { credentials: "same-origin" });
+      const t = await r.text();
+      let data;
+      try {
+        data = JSON.parse(t);
+      } catch {
+        modelEl.innerHTML = "<option>GigaChat</option>";
+        return;
+      }
+      const items = data.data || [];
+      modelEl.innerHTML = items.length
+        ? items.map((m) => "<option value=\"" + escapeAttr(m.id) + "\">" + escapeHtml(m.id) + "</option>").join("")
+        : "<option value=\"GigaChat\">GigaChat</option>";
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+    function escapeAttr(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    }
+
+    providerEl.onchange = () => {
+      const oc = providerEl.value === "openclaw";
+      wrapModel.style.display = oc ? "none" : "block";
+    };
+
+    async function check() {
+      await loadConfig();
+      await loadModels();
+      const r = await fetch("/api/me", { credentials: "same-origin" });
+      const j = await r.json();
+      if (!j.user && !j.skipAuth) {
+        location.href = "/login.html";
+        return;
+      }
+      document.getElementById("who").textContent = j.skipAuth
+        ? "гость"
+        : j.user.email + " · " + (j.user.plan || "free");
+      if (j.skipAuth) {
+        document.getElementById("logout").style.display = "none";
+      }
+    }
+    check();
+
+    document.getElementById("logout").onclick = async (e) => {
+      e.preventDefault();
+      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+      location.href = "/login.html";
+    };
+
+    function append(role, text) {
+      const d = document.createElement("div");
+      d.className = "msg";
+      d.innerHTML = "<p class=\"role\"></p><p style=\"margin:0.2rem 0 0\"></p>";
+      d.querySelector(".role").textContent = role;
+      d.querySelector("p:last-child").textContent = text;
+      logEl.appendChild(d);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    document.getElementById("clear").onclick = () => {
+      history = [{ role: "system", content: systemPrompt() }];
+      logEl.innerHTML = "";
+      rawEl.textContent = "";
+    };
+
+    document.getElementById("send").onclick = async () => {
+      history[0] = { role: "system", content: systemPrompt() };
+      const err = document.getElementById("err");
+      err.style.display = "none";
+      const text = document.getElementById("input").value.trim();
+      if (!text) return;
+      document.getElementById("input").value = "";
+      append("Вы", text);
+      history.push({ role: "user", content: text });
+
+      const prov = providerEl.value;
+      const body = {
+        messages: history,
+        provider: prov,
+        temperature: 0.7,
+      };
+      if (prov === "gpt2giga") {
+        body.model = modelEl.value || "GigaChat";
+      } else {
+        body.model = undefined;
+      }
+
+      const r = await fetch("/api/chat", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const t = await r.text();
+      rawEl.textContent = t;
+      const label = prov === "openclaw" ? "OpenClaw" : "GigaChat";
+      try {
+        const j = JSON.parse(t);
+        if (!r.ok) {
+          err.textContent = j.error || t;
+          err.style.display = "block";
+          append("Ошибка", j.error || t);
+          return;
+        }
+        const reply =
+          j.choices?.[0]?.message?.content ||
+          j.error?.message ||
+          "—";
+        append(label, reply);
+        if (j.choices?.[0]?.message?.content) {
+          history.push({ role: "assistant", content: j.choices[0].message.content });
+        }
+      } catch {
+        append("Ошибка", t);
+      }
+    };
+  </script>
+</body>
+</html>

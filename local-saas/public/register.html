@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Регистрация — Local OpenClaw</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/landing.css" />
+</head>
+<body class="page-landing">
+  <header class="topbar">
+    <a class="logo" href="/">Local OpenClaw</a>
+    <nav class="topnav">
+      <a href="/">Главная</a>
+      <a href="/login.html">Вход</a>
+      <a href="/subscription.html">Тарифы</a>
+    </nav>
+  </header>
+  <div class="wrap">
+    <h1>Регистрация</h1>
+    <p class="lead">Локальный аккаунт, пароль ≥ 6 символов. Файл данных: <code>local-saas/data/users.json</code>.</p>
+    <div class="card">
+      <p class="err" id="err" style="display:none"></p>
+      <label>Email</label>
+      <input id="email" type="email" autocomplete="username" />
+      <label>Пароль</label>
+      <input id="password" type="password" autocomplete="new-password" />
+      <button type="button" id="btn">Создать аккаунт</button>
+    </div>
+  </div>
+  <script>
+    document.getElementById("btn").onclick = async () => {
+      const err = document.getElementById("err");
+      err.style.display = "none";
+      const r = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: document.getElementById("email").value.trim(),
+          password: document.getElementById("password").value,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        err.textContent = j.error || r.status;
+        err.style.display = "block";
+        return;
+      }
+      location.href = "/dashboard.html";
+    };
+  </script>
+</body>
+</html>

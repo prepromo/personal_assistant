@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Тарифы — Local OpenClaw</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/landing.css" />
+  <style>
+    .plans { display: grid; gap: 1rem; max-width: 640px; margin: 0 auto; padding: 0 1rem 2rem; }
+    .plan {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .plan h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+    .plan .price { color: var(--accent); font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0; }
+    ul { margin: 0.5rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body class="page-landing">
+  <header class="topbar">
+    <a class="logo" href="/">Local OpenClaw</a>
+    <nav class="topnav">
+      <a href="/dashboard.html">Кабинет</a>
+      <a href="/login.html">Вход</a>
+      <a href="/register.html">Регистрация</a>
+    </nav>
+  </header>
+  <div class="wrap" style="max-width: 640px; margin-top: 1.5rem">
+    <h1>Тарифы (локальный мок)</h1>
+    <p class="lead">Имитация страницы выбора подписки, как на коммерческих SaaS. Оплаты нет — всё для теста UI и сценариев.</p>
+  </div>
+  <div class="plans">
+    <div class="plan">
+      <h2>Free</h2>
+      <span class="price">0 ₽</span>
+      <ul>
+        <li>Вход и сессия в браузере</li>
+        <li>Чат: GigaChat (gpt2giga) и опционально OpenClaw gateway</li>
+      </ul>
+    </div>
+    <div class="plan" style="border-color: #3d5a80">
+      <h2>Pro (мок)</h2>
+      <span class="price">—</span>
+      <p style="color: var(--muted); font-size: 0.88rem; margin: 0 0 0.5rem">Здесь позже можно добавить лимиты и оплату.</p>
+      <ul>
+        <li>Те же функции, метка «pro» в <code>/api/me</code> после доработки бэкенда</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

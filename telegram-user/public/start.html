@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telegram User — локально</title>
+  <style>
+    :root {
+      --bg: #0c0e12;
+      --card: #151922;
+      --text: #e8ecf1;
+      --muted: #8a96a8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --border: #2a3140;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+      text-align: center;
+    }
+    p.lead {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin: 0 0 2rem;
+      text-align: center;
+      max-width: 28rem;
+      line-height: 1.5;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 22rem;
+    }
+    a.card {
+      display: block;
+      padding: 1.1rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      text-decoration: none;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    a.card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+    a.card.primary {
+      background: linear-gradient(145deg, #1e3a5f 0%, var(--card) 100%);
+      border-color: #3d5a80;
+    }
+    a.card.primary strong {
+      color: #93c5fd;
+    }
+    a.card span.sub {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+      line-height: 1.4;
+    }
+    .foot {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    code { font-size: 0.85em; background: #1a1f28; padding: 0.1em 0.35em; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Telegram User</h1>
+  <p class="lead">Локальная отладка. Выберите, куда зайти — одна ссылка, без лишних путей.</p>
+  <nav class="actions" aria-label="Разделы">
+    <a class="card primary" href="/mvp.html">
+      <strong>Тестовый MVP</strong>
+      <span class="sub">Токен из <code>.env</code>, диалоги, сообщения, отправка, задачи. Для разработчика.</span>
+    </a>
+    <a class="card" href="/cabinet.html">
+      <strong>Веб-кабинет</strong>
+      <span class="sub">Сначала в боте: «Личный кабинет» или /id — скопировать appUserId. Потом коннектор (ensure-account + login), затем регистрация здесь.</span>
+    </a>
+  </nav>
+  <p class="foot">API: <code id="apiHint"></code> · <a href="/health" style="color: var(--accent);">/health</a></p>
+  <script>
+    document.getElementById("apiHint").textContent = location.origin;
+  </script>
+</body>
+</html>

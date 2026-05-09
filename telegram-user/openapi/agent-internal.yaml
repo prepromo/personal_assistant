@@ -1,0 +1,210 @@
+openapi: 3.0.3
+info:
+  title: Telegram User Internal API (agent)
+  description: |
+    Внутренний API для агента (OpenClaw/tools). Не содержит MTProto — только данные,
+    синхронизированные коннектором, и разрешённые действия.
+  version: 0.1.0
+
+servers:
+  - url: http://127.0.0.1:4050
+    description: Локальная разработка (пример порта)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: OK
+
+  /v1/accounts/{accountId}/dialogs:
+    get:
+      summary: Список диалогов (с пагинацией)
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: Список диалогов
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DialogListResponse"
+
+  /v1/dialogs/{dialogId}/messages:
+    get:
+      summary: История сообщений
+      parameters:
+        - name: dialogId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: beforeId
+          in: query
+          description: Внутренний id сообщения или tgMessageId — по контракту реализации
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        "200":
+          description: Сообщения
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+
+  /v1/dialogs/{dialogId}/send:
+    post:
+      summary: Отправить сообщение (только если политика разрешает)
+      parameters:
+        - name: dialogId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "202":
+          description: Принято в очередь / отправлено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendMessageResponse"
+        "403":
+          description: Политика запрещает отправку
+
+  /v1/dialogs/{dialogId}/read:
+    post:
+      summary: Отметить прочитанным (до указанного message id)
+      parameters:
+        - name: dialogId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                upToTgMessageId:
+                  type: integer
+      responses:
+        "204":
+          description: OK
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Dialog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        peerKey:
+          type: string
+        title:
+          type: string
+          nullable: true
+        dialogType:
+          type: string
+          enum: [user, group, supergroup, channel]
+        unreadLocal:
+          type: integer
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    DialogListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dialog"
+        nextCursor:
+          type: string
+          nullable: true
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tgMessageId:
+          type: integer
+        date:
+          type: string
+          format: date-time
+        text:
+          type: string
+          nullable: true
+        out:
+          type: boolean
+
+    MessageListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+
+    SendMessageRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          maxLength: 4096
+
+    SendMessageResponse:
+      type: object
+      properties:
+        queued:
+          type: boolean
+        tgMessageId:
+          type: integer
+          nullable: true

@@ -1,0 +1,436 @@
+// Отдельная БД от Comrade: личный Telegram (MTProto), синхронизация и аудит агента.
+// Рекомендуется PostgreSQL (прод и локально через docker compose). SQLite только для legacy.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Статус подключённого личного аккаунта Telegram
+enum TgAccountStatus {
+  pending_auth
+  active
+  sync_paused
+  error
+  revoked
+}
+
+/// Тип диалога (упрощённо; детали MTProto в rawPeer при необходимости)
+enum TgDialogType {
+  user
+  group
+  supergroup
+  channel
+}
+
+/// Запись аудита вызовов internal API (агент / сервис)
+enum TgAuditActor {
+  agent
+  user_ui
+  system
+  connector
+}
+
+enum TaskStatus {
+  open
+  done
+}
+
+enum ReminderStatus {
+  pending
+  /// Уведомление в бот отправлено, ждём «Сделано» / «Ещё нет»
+  awaiting_confirm
+  sent
+  /// Пользователь нажал «Сделано» в боте
+  completed
+  cancelled
+}
+
+/// MVP Comrade AI: шаблонная «задача-агент» со state machine
+enum ComradeTaskStatus {
+  CREATED
+  WAITING_CONFIRMATION
+  FIRST_MESSAGE_PENDING
+  WAITING_RESPONSE
+  FOLLOWUP_DUE
+  RESPONSE_RECEIVED
+  GOAL_ACHIEVED
+  PAUSED
+  CLOSED
+}
+
+enum ComradeTemplateType {
+  GET_DOCUMENT
+  FOLLOWUP_REPLY
+  SCHEDULE_MEETING
+  COLLECT_INFO
+  REMIND_AGREEMENT
+}
+
+/// Подписка веб-кабинета (оплата на сайте; без записи — дозаполняется при /me)
+enum CabinetSubscriptionStatus {
+  pending_payment
+  active
+  canceled
+}
+
+/// Пользователь веб-кабинета (логин/пароль и/или OIDC), строго 1:1 с appUserId → TgAccount
+model CabinetUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String?
+  oidcSub      String?  @unique
+  appUserId    String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  chatMessages AssistantChatMessage[]
+  subscription CabinetSubscription?
+}
+
+/// Один тариф на пользователя кабинета; currentPeriodEnd — конец оплаченного периода (помесячно)
+model CabinetSubscription {
+  id               String                    @id @default(uuid())
+  cabinetUserId    String                    @unique
+  cabinetUser      CabinetUser               @relation(fields: [cabinetUserId], references: [id], onDelete: Cascade)
+  status           CabinetSubscriptionStatus @default(pending_payment)
+  planCode         String                    @default("monthly")
+  currentPeriodEnd DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+}
+
+/// Сообщения чата с ассистентом (кабинет)
+model AssistantChatMessage {
+  id        String      @id @default(uuid())
+  userId    String
+  user      CabinetUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime    @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Очередь автоматизации автоответа (идемпотентность по accountId+dialogId+triggerTgMessageId)
+model TgAutomationJob {
+  id                 String   @id @default(uuid())
+  accountId          String
+  account            TgAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  dialogId           String
+  triggerTgMessageId Int
+  /// auto — поставить ответ в TgPendingSend; suggest — только аудит с текстом (без отправки)
+  kind               String   @default("auto")
+  status             String   @default("pending")
+  error              String?
+  /// Логический агент (промпт/план); null — базовый режим без ProductAgent
+  productAgentId     String?
+  productAgent       ProductAgent? @relation(fields: [productAgentId], references: [id], onDelete: SetNull)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([accountId, dialogId, triggerTgMessageId])
+  @@index([accountId, status])
+  @@index([productAgentId])
+}
+
+/// До 5 именованных агентов на appUserId (настройка промпта/плана и привязка к диалогам)
+model ProductAgent {
+  id             String   @id @default(uuid())
+  appUserId      String
+  name           String
+  sortOrder      Int      @default(0)
+  enabled        Boolean  @default(true)
+  /// JSON: параметры «плана» (произвольная структура продукта)
+  planJson       String   @default("{}")
+  /// Доп. инструкции к системному промпту автоответа
+  promptExtras   String   @default("")
+  /// Агент по умолчанию, если у диалога нет явной привязки
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  dialogs        ProductAgentDialog[]
+  automationJobs TgAutomationJob[]
+
+  @@index([appUserId])
+  @@index([appUserId, sortOrder])
+}
+
+/// Один диалог — не более одного ProductAgent (явное назначение)
+model ProductAgentDialog {
+  id             String       @id @default(uuid())
+  productAgentId String
+  productAgent   ProductAgent @relation(fields: [productAgentId], references: [id], onDelete: Cascade)
+  dialogId       String
+  dialog         TgDialog     @relation(fields: [dialogId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([dialogId])
+  @@index([productAgentId])
+}
+
+/// Короткие заметки пользователя (отдельно от Task)
+model UserNote {
+  id        String   @id @default(uuid())
+  appUserId String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([appUserId, createdAt])
+}
+
+/// Посты из Bot API (группы/каналы), где бот видит сообщения
+model BotChannelPost {
+  id             String   @id @default(uuid())
+  appUserId      String
+  telegramChatId String
+  messageId      Int
+  date           DateTime
+  text           String   @default("")
+  rawJson        String   @default("{}")
+  createdAt      DateTime @default(now())
+
+  @@unique([appUserId, telegramChatId, messageId])
+  @@index([appUserId, date])
+}
+
+/// Подписка на дайджест новостей: MTProto-диалог или чат бота
+model NewsSubscription {
+  id           String    @id @default(uuid())
+  appUserId    String
+  /// mtproto_dialog | bot_chat
+  sourceKind   String
+  /// UUID TgDialog или telegramChatId (строка) для bot_chat
+  sourceId     String
+  title        String?
+  enabled      Boolean   @default(true)
+  lastDigestAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([appUserId, sourceKind, sourceId])
+  @@index([appUserId, enabled])
+}
+
+/// Последний ping воркера (коннектор)
+model WorkerPing {
+  id         String    @id @default("singleton")
+  accountId  String?
+  lastSeenAt DateTime?
+  metaJson   String    @default("{}")
+}
+
+/// Привязка Telegram user id (бот / Bot API) к appUserId продукта — для OpenClaw и мультипользовательского режима
+model TgBotUserBinding {
+  id               String   @id @default(uuid())
+  /// Числовой id пользователя Telegram (строка, т.к. > 2^53)
+  telegramUserId   String   @unique
+  appUserId        String
+  /// JSON: шаг диалога (MVP-бот), черновики задач/напоминаний
+  metaJson         String   @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([appUserId])
+}
+
+/// Чаты/каналы, добавленные пользователем через forward (MVP продуктового бота), без MTProto
+model BotConnectedChat {
+  id             String   @id @default(uuid())
+  appUserId      String
+  /// id чата в Telegram (строка; группы отрицательные)
+  telegramChatId String
+  title          String?
+  /// private | group | supergroup | channel
+  chatKind       String   @default("unknown")
+  createdAt      DateTime @default(now())
+
+  @@unique([appUserId, telegramChatId])
+  @@index([appUserId])
+}
+
+model TgAccount {
+  id           String          @id @default(uuid())
+  /// ID пользователя продукта (например Comrade User.id)
+  appUserId    String
+  /// Хэш идентификатора телефона (не хранить E.164 plaintext в проде без необходимости)
+  phoneIdHash  String?
+  /// Зашифрованная Pyrogram StringSession (пустой Buffer до первого login)
+  sessionEnc   Bytes
+  sessionVer   Int             @default(1)
+  status       TgAccountStatus @default(pending_auth)
+  lastError    String?
+  /// JSON политики агента: send_allowed, mark_read_allowed и т.д.
+  policyJson   String          @default("{}")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  dialogs      TgDialog[]
+  messages     TgMessage[]
+  syncState    TgSyncState?
+  auditLogs    TgAgentAuditLog[]
+  pendingSends TgPendingSend[]
+  reminders    Reminder[]
+  automationJobs TgAutomationJob[]
+  agentAllowedDialogs TgAgentAllowedDialog[]
+
+  @@unique([appUserId])
+  @@index([status])
+}
+
+/// Задачи v1: общий список на appUserId (мультипользовательский продукт)
+model Task {
+  id        String     @id @default(uuid())
+  appUserId String
+  title     String
+  body      String?
+  status    TaskStatus @default(open)
+  dueAt     DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([appUserId, status])
+}
+
+/// Напоминания: Telegram (через очередь) + отметка для веб-панели
+model Reminder {
+  id             String         @id @default(uuid())
+  appUserId      String
+  accountId      String?
+  account        TgAccount?     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  title          String
+  text           String
+  fireAt         DateTime
+  notifyTelegram Boolean        @default(true)
+  notifyWeb      Boolean        @default(true)
+  status         ReminderStatus @default(pending)
+  /// Встреча из автоответа: первое уведомление — в бот с кнопками, до «Сделано» не считается завершённой
+  requiresBotAck Boolean        @default(false)
+  telegramSentAt DateTime?
+  webSentAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([appUserId, status])
+  @@index([fireAt, status])
+}
+
+model TgDialog {
+  id          String       @id @default(uuid())
+  accountId   String
+  account     TgAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Стабильный peer id в строковом виде (реализация коннектора)
+  peerKey     String
+  title       String?
+  dialogType  TgDialogType
+  /// Последний известный tg message id (для инкремента)
+  lastMsgId   Int?
+  unreadLocal Int          @default(0)
+  lastSyncedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  messages    TgMessage[]
+  agentAllowances TgAgentAllowedDialog[]
+  productAgentAssignment ProductAgentDialog?
+  comradeTasks ComradeTask[]
+
+  @@unique([accountId, peerKey])
+  @@index([accountId])
+}
+
+/// Задача по шаблону (MVP Comrade): без автоматической отправки внешним контактам без подтверждения владельца
+model ComradeTask {
+  id            String               @id @default(uuid())
+  appUserId     String
+  title         String
+  objective     String               @default("")
+  templateType  ComradeTemplateType
+  status        ComradeTaskStatus    @default(CREATED)
+  linkedChatId  String?
+  linkedDialog  TgDialog?            @relation(fields: [linkedChatId], references: [id], onDelete: SetNull)
+  nextActionAt  DateTime?
+  lastReportAt  DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([appUserId, status])
+  @@index([linkedChatId])
+}
+
+/// Чаты, с которыми разрешено работать агенту (HTTP API с AGENT_API_TOKEN), при agentScope=allowlist
+model TgAgentAllowedDialog {
+  id        String   @id @default(uuid())
+  accountId String
+  account   TgAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  dialogId  String
+  dialog    TgDialog  @relation(fields: [dialogId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([accountId, dialogId])
+  @@index([accountId])
+}
+
+model TgMessage {
+  id          String    @id @default(uuid())
+  accountId   String
+  account     TgAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  dialogId    String
+  dialog      TgDialog  @relation(fields: [dialogId], references: [id], onDelete: Cascade)
+  tgMessageId Int
+  date        DateTime
+  text        String?
+  out         Boolean   @default(false)
+  /// Опционально: зашифрованный сырой JSON для отладки/повторной обработки
+  rawEnc      Bytes?
+  createdAt   DateTime  @default(now())
+
+  @@unique([dialogId, tgMessageId])
+  @@index([dialogId, date])
+  @@index([accountId])
+}
+
+/// Курсор синка/updates (коннектор)
+model TgSyncState {
+  id           String    @id @default(uuid())
+  accountId    String    @unique
+  account      TgAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Серверная сущность курсора (зависит от Telethon/Pyrogram/TDLib)
+  cursorPts    Int?
+  cursorQts    Int?
+  cursorDate   Int?
+  extraJson    String    @default("{}")
+  updatedAt    DateTime  @updatedAt
+}
+
+/// Очередь исходящих из API агента → коннектор отправляет через Pyrogram
+model TgPendingSend {
+  id         String    @id @default(uuid())
+  accountId  String
+  account    TgAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  peerKey    String
+  text       String
+  status     String    @default("pending")
+  error      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([accountId, status])
+}
+
+model TgAgentAuditLog {
+  id         String       @id @default(uuid())
+  accountId  String
+  account    TgAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  actor      TgAuditActor
+  action     String
+  resource   String?
+  metaJson   String       @default("{}")
+  ip         String?
+  createdAt  DateTime     @default(now())
+
+  @@index([accountId, createdAt])
+}
