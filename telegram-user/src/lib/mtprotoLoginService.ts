@@ -1,5 +1,8 @@
 import { prisma } from "./prisma.js";
-import { runLoginWizard } from "./mtprotoLoginRunner.js";
+import {
+  disposeLoginWizardWorker,
+  runLoginWizardAsync,
+} from "./mtprotoLoginRunner.js";
 import { getCabinetSubscription, subscriptionGrantsPaidFeatures } from "./cabinetSubscription.js";
 
 const defaultTgPolicyJson = JSON.stringify({
@@ -62,15 +65,18 @@ export async function persistSessionAndLink(
   appUserId: string,
   sessionString: string,
   telegramUserId: number,
+  opts?: { bindingTelegramUserId?: string },
 ): Promise<void> {
   const s1 = await internalPost("/internal/session", { appUserId, sessionString });
   if (!s1.ok) {
     const t = await s1.text();
     throw new Error(`session: ${s1.status} ${t}`);
   }
+  const bind = opts?.bindingTelegramUserId?.trim();
   const s2 = await internalPost("/internal/link-telegram-user-to-account", {
     appUserId,
     telegramUserId: String(telegramUserId),
+    ...(bind ? { bindingTelegramUserId: bind } : {}),
   });
   if (!s2.ok) {
     const t = await s2.text();
@@ -78,25 +84,41 @@ export async function persistSessionAndLink(
   }
 }
 
-export async function mtprotoSendCode(appUserId: string, phone: string): Promise<void> {
+export async function mtprotoSendCode(
+  appUserId: string,
+  phone: string,
+  forceResend = false,
+): Promise<void> {
   return chainWizard(appUserId, async () => {
     await ensureTgAccountRow(appUserId);
     const r = await internalPost("/internal/ensure-account", { appUserId });
     if (!r.ok) {
       const t = await r.text();
+      await disposeLoginWizardWorker(appUserId);
       throw new Error(`ensure-account: ${r.status} ${t}`);
     }
-    const out = runLoginWizard({ cmd: "send_code", app_user_id: appUserId, phone });
+    const out = await runLoginWizardAsync({
+      cmd: "send_code",
+      app_user_id: appUserId,
+      phone,
+      force_resend: forceResend,
+    });
     if (out.ok !== true) {
+      await disposeLoginWizardWorker(appUserId);
       throw new Error(String(out.error || "send_code_failed"));
     }
   });
 }
 
-export async function mtprotoSignIn(appUserId: string, code: string): Promise<{ needPassword: boolean }> {
+export async function mtprotoSignIn(
+  appUserId: string,
+  code: string,
+  opts?: { bindingTelegramUserId?: string },
+): Promise<{ needPassword: boolean }> {
   return chainWizard(appUserId, async () => {
-    const out = runLoginWizard({ cmd: "sign_in", app_user_id: appUserId, code });
+    const out = await runLoginWizardAsync({ cmd: "sign_in", app_user_id: appUserId, code });
     if (out.ok !== true) {
+      await disposeLoginWizardWorker(appUserId);
       throw new Error(String(out.error || "sign_in_failed"));
     }
     if (out.need_password === true) {
@@ -105,25 +127,42 @@ export async function mtprotoSignIn(appUserId: string, code: string): Promise<{ 
     const sessionString = String(out.session_string || "");
     const tid = Number(out.telegram_user_id);
     if (!sessionString || !Number.isFinite(tid)) {
+      await disposeLoginWizardWorker(appUserId);
       throw new Error("wizard_missing_session_or_id");
     }
-    await persistSessionAndLink(appUserId, sessionString, tid);
+    try {
+      await persistSessionAndLink(appUserId, sessionString, tid, {
+        bindingTelegramUserId: opts?.bindingTelegramUserId,
+      });
+    } finally {
+      await disposeLoginWizardWorker(appUserId);
+    }
     return { needPassword: false };
   });
 }
 
-export async function mtprotoPassword(appUserId: string, password: string): Promise<void> {
+export async function mtprotoPassword(
+  appUserId: string,
+  password: string,
+  opts?: { bindingTelegramUserId?: string },
+): Promise<void> {
   return chainWizard(appUserId, async () => {
-    const out = runLoginWizard({ cmd: "password", app_user_id: appUserId, password });
-    if (out.ok !== true) {
-      throw new Error(String(out.error || "password_failed"));
+    try {
+      const out = await runLoginWizardAsync({ cmd: "password", app_user_id: appUserId, password });
+      if (out.ok !== true) {
+        throw new Error(String(out.error || "password_failed"));
+      }
+      const sessionString = String(out.session_string || "");
+      const tid = Number(out.telegram_user_id);
+      if (!sessionString || !Number.isFinite(tid)) {
+        throw new Error("wizard_missing_session_or_id");
+      }
+      await persistSessionAndLink(appUserId, sessionString, tid, {
+        bindingTelegramUserId: opts?.bindingTelegramUserId,
+      });
+    } finally {
+      await disposeLoginWizardWorker(appUserId);
     }
-    const sessionString = String(out.session_string || "");
-    const tid = Number(out.telegram_user_id);
-    if (!sessionString || !Number.isFinite(tid)) {
-      throw new Error("wizard_missing_session_or_id");
-    }
-    await persistSessionAndLink(appUserId, sessionString, tid);
   });
 }
 

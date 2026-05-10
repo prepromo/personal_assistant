@@ -9,7 +9,7 @@ import { needsTelegramMtprotoLogin } from "./mtprotoLoginService.js";
 
 /** Агенты и задачи «агент + контакт» только после сохранённой MTProto-сессии (/connect). */
 export const NL_AGENT_REQUIRES_MTPROTO_MESSAGE =
-  "Сначала подключите личный Telegram: выполните /connect в этом чате (номер и код из Telegram) или войдите через веб-кабинет. Без этого агент не создаётся.";
+  "Сначала подключите личный Telegram: команда /connect → откройте веб-кабинет и в блоке «Личный Telegram» введите номер и код только на сайте. Без этого агент не создаётся.";
 
 export type NlDialogLink = { dialogId: string; label: string };
 

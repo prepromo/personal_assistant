@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Подключение Telegram — Comrade AI</title>
+  <link rel="icon" type="image/png" href="/favicon.png" sizes="32x32" />
+  <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/favicon.png" />
+  <style>
+    :root {
+      --bg: #0c1017;
+      --panel: #151b26;
+      --text: #e8edf5;
+      --muted: #8b9aaf;
+      --accent: #3b82f6;
+      --border: #2a3444;
+      --ok: #22c55e;
+      --err: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; }
+    a { color: var(--accent); }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--panel);
+    }
+    h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
+    main { max-width: 520px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    .note { color: var(--muted); font-size: 0.85rem; line-height: 1.45; margin: 0 0 1rem; }
+    label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input, button {
+      width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 0.9rem; margin-bottom: 0.6rem;
+    }
+    button {
+      background: var(--accent); color: #fff; border: none; cursor: pointer; font-weight: 500;
+    }
+    button.secondary { background: #374151; }
+    #telegram-widget-mount { display:flex; justify-content:center; min-height:52px; margin: 1rem 0; }
+    .card {
+      border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1rem;
+      background: #121923;
+    }
+    .status-err { color: var(--err); font-size: 0.88rem; min-height: 1.25rem; }
+    .status-ok { color: var(--ok); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Подключение личного Telegram</h1>
+    <div style="display:flex;gap:0.75rem;align-items:center;font-size:0.88rem">
+      <a href="/cabinet.html">Полный кабинет</a>
+      <a href="/">На главную</a>
+    </div>
+  </header>
+  <main>
+    <p class="note">
+      Откройте эту страницу из бота по кнопке <strong>/connect</strong>. Номер и код входа вводите <strong>только здесь</strong>,
+      не в чате с ботом.
+    </p>
+    <p id="pageErr" class="status-err"></p>
+
+    <div id="authBlock" class="card" style="display:none">
+      <h2 style="font-size:1rem;margin:0 0 0.75rem">Вход на сайт</h2>
+      <p class="note" style="margin-top:0">Чтобы подключить аккаунт, сначала войдите (или зарегистрируйтесь в кабинете).</p>
+      <p class="note" style="text-align:center;margin-bottom:0.5rem"><strong>Вход через Telegram</strong></p>
+      <div id="telegram-widget-mount"></div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0" />
+      <label>Email</label>
+      <input id="email" type="email" autocomplete="username" />
+      <label>Пароль</label>
+      <input id="password" type="password" autocomplete="current-password" />
+      <button type="button" id="btnLogin">Войти</button>
+      <p class="note" style="margin-bottom:0">Нет аккаунта — <a href="/cabinet.html">регистрация в кабинете</a>.</p>
+    </div>
+
+    <div id="loggedBlock" style="display:none">
+      <p id="userHint" class="note"></p>
+
+      <div id="needsPaid" class="card" style="display:none">
+        <p class="note" style="margin:0">
+          Нужна активная подписка или триал. Откройте <a href="/cabinet.html">кабинет</a> — блок «Статус» / оплата.
+        </p>
+      </div>
+
+      <div id="doneBlock" class="card status-ok" style="display:none">
+        Личный Telegram уже подключён. Можно закрыть вкладку или открыть <a href="/cabinet.html">кабинет</a>.
+      </div>
+
+      <div id="mtpWrap" class="card" style="display:none">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Ввод номера и кода</h2>
+        <p class="note" style="margin-top:0">
+          Формат <code>+7…</code>, код из приложения Telegram, при необходимости пароль 2FA. На сервере нужны
+          <code>TELEGRAM_API_ID</code> / <code>TELEGRAM_API_HASH</code> в <code>connector/.env</code>.
+        </p>
+        <label>Телефон</label>
+        <input id="mtpPhone" type="tel" placeholder="+79991234567" autocomplete="tel" />
+        <button type="button" id="btnMtpSendCode">Отправить код</button>
+        <label style="margin-top:0.5rem">Код из Telegram</label>
+        <input id="mtpCode" inputmode="numeric" placeholder="12345" autocomplete="one-time-code" />
+        <button type="button" id="btnMtpSignIn">Подтвердить код</button>
+        <div id="mtpPwdBlock" style="display:none;margin-top:0.5rem">
+          <label>Пароль 2FA Telegram</label>
+          <input id="mtpPwd" type="password" autocomplete="current-password" />
+          <button type="button" id="btnMtpPwd">Подтвердить пароль</button>
+        </div>
+        <p id="mtpStatus" class="note" style="margin-top:0.5rem;min-height:1rem"></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- См. комментарий в cabinet.html про __CABINET_API_ORIGIN__ и CORS. -->
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const CABINET_API_ORIGIN =
+      typeof window !== "undefined" && window.__CABINET_API_ORIGIN__
+        ? String(window.__CABINET_API_ORIGIN__).replace(/\/$/, "")
+        : "";
+    function apiUrl(path) {
+      if (!path || path.startsWith("http://") || path.startsWith("https://")) return path;
+      return CABINET_API_ORIGIN + path;
+    }
+    function apiHeaders() {
+      const h = { "Content-Type": "application/json" };
+      const t = sessionStorage.getItem("cabinet_token");
+      if (t) h["Authorization"] = "Bearer " + t;
+      return h;
+    }
+    const api = (path, opts = {}) =>
+      fetch(apiUrl(path), {
+        credentials: "include",
+        headers: { ...apiHeaders(), ...(opts.headers || {}) },
+        ...opts,
+      });
+
+    async function loadMe() {
+      const r = await api("/api/v1/auth/me");
+      if (!r.ok) return null;
+      return r.json();
+    }
+
+    let mtpBound = false;
+    function bindMtpHandlers() {
+      if (mtpBound) return;
+      mtpBound = true;
+      const st = $("mtpStatus");
+      const pwdBlock = $("mtpPwdBlock");
+      $("btnMtpSendCode").onclick = async () => {
+        const phone = ($("mtpPhone").value || "").trim().replace(/\s/g, "");
+        st.textContent = "Отправка…";
+        pwdBlock.style.display = "none";
+        const r = await api("/api/v1/cabinet/mtproto/login/start", {
+          method: "POST",
+          body: JSON.stringify({ phone }),
+        });
+        const raw = await r.text();
+        if (!r.ok) {
+          st.textContent = raw;
+          return;
+        }
+        try {
+          const j = JSON.parse(raw);
+          st.textContent = j.message || "Код отправлен";
+        } catch (_) {
+          st.textContent = raw;
+        }
+      };
+      $("btnMtpSignIn").onclick = async () => {
+        const code = ($("mtpCode").value || "").trim().replace(/\s/g, "");
+        st.textContent = "Проверка…";
+        const r = await api("/api/v1/cabinet/mtproto/login/confirm", {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        });
+        const raw = await r.text();
+        if (!r.ok) {
+          st.textContent = raw;
+          return;
+        }
+        let j = {};
+        try {
+          j = JSON.parse(raw);
+        } catch (_) {}
+        if (j.needPassword) {
+          pwdBlock.style.display = "block";
+          st.textContent = j.message || "Введите пароль 2FA";
+          return;
+        }
+        st.textContent = j.message || "Готово";
+        await paint();
+      };
+      $("btnMtpPwd").onclick = async () => {
+        const password = ($("mtpPwd").value || "").trim();
+        st.textContent = "Проверка пароля…";
+        const r = await api("/api/v1/cabinet/mtproto/login/password", {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        });
+        const raw = await r.text();
+        if (!r.ok) {
+          st.textContent = raw;
+          return;
+        }
+        try {
+          const j = JSON.parse(raw);
+          st.textContent = j.message || "Готово";
+        } catch (_) {
+          st.textContent = raw;
+        }
+        pwdBlock.style.display = "none";
+        await paint();
+      };
+    }
+
+    async function mountTelegramLoginWidget() {
+      const m = $("telegram-widget-mount");
+      if (!m) return;
+      m.innerHTML = "";
+      try {
+        const r = await fetch(apiUrl("/api/v1/auth/bootstrap-public"));
+        const j = await r.json();
+        if (!j.telegramLoginAvailable || !j.telegramBotUsername) {
+          m.innerHTML =
+            '<p class="note" style="text-align:center">Виджет: задайте <code>PRODUCT_BOT_USERNAME</code> и <code>PRODUCT_BOT_TOKEN</code> в .env API.</p>';
+          return;
+        }
+        const cb =
+          (CABINET_API_ORIGIN || location.origin) +
+          "/api/v1/auth/telegram-callback?" +
+          new URLSearchParams({ next: "connect.html" }).toString();
+        const s = document.createElement("script");
+        s.src = "https://telegram.org/js/telegram-widget.js?22";
+        s.async = true;
+        s.setAttribute("data-telegram-login", j.telegramBotUsername);
+        s.setAttribute("data-size", "large");
+        s.setAttribute("data-auth-url", cb);
+        m.appendChild(s);
+      } catch {
+        m.textContent = "Не удалось загрузить виджет входа.";
+      }
+    }
+
+    async function paint() {
+      const errEl = $("pageErr");
+      errEl.textContent = "";
+      $("mtpPwdBlock").style.display = "none";
+      $("mtpPwd").value = "";
+      $("mtpStatus").textContent = "";
+
+      const data = await loadMe();
+      if (!data || !data.user) {
+        $("authBlock").style.display = "block";
+        $("loggedBlock").style.display = "none";
+        await mountTelegramLoginWidget();
+        return;
+      }
+
+      $("authBlock").style.display = "none";
+      $("loggedBlock").style.display = "block";
+      $("userHint").textContent = data.user.email + " · appUserId: " + data.user.appUserId;
+
+      const r = await api("/api/v1/cabinet/mtproto/status");
+      if (!r.ok) {
+        errEl.textContent = "Не удалось загрузить статус MTProto.";
+        $("needsPaid").style.display = "none";
+        $("mtpWrap").style.display = "none";
+        $("doneBlock").style.display = "none";
+        return;
+      }
+      const j = await r.json();
+      if (!j.paid) {
+        $("needsPaid").style.display = "block";
+        $("mtpWrap").style.display = "none";
+        $("doneBlock").style.display = "none";
+        return;
+      }
+      $("needsPaid").style.display = "none";
+      if (!j.needsLogin) {
+        $("mtpWrap").style.display = "none";
+        $("doneBlock").style.display = "block";
+        return;
+      }
+      $("mtpWrap").style.display = "block";
+      $("doneBlock").style.display = "none";
+      $("mtpStatus").textContent = "Введите номер (+7…) и код только здесь.";
+      bindMtpHandlers();
+    }
+
+    (async () => {
+      const usp = new URLSearchParams(location.search);
+      if (usp.get("tg_err")) $("pageErr").textContent = "Вход через Telegram: " + usp.get("tg_err");
+      if (usp.get("tg_ok")) {
+        try {
+          history.replaceState({}, "", location.pathname);
+        } catch (_) {}
+      }
+
+      $("btnLogin").onclick = async () => {
+        $("pageErr").textContent = "";
+        const body = {
+          email: $("email").value.trim(),
+          password: $("password").value,
+        };
+        const r = await api("/api/v1/auth/login", { method: "POST", body: JSON.stringify(body) });
+        const t = await r.text();
+        if (!r.ok) {
+          $("pageErr").textContent = t.length < 400 ? t : "Ошибка входа";
+          return;
+        }
+        try {
+          const j = JSON.parse(t);
+          if (j.token) sessionStorage.setItem("cabinet_token", j.token);
+        } catch (_) {}
+        await paint();
+      };
+
+      await paint();
+    })();
+  </script>
+</body>
+</html>

@@ -27,6 +27,15 @@ const r = Router();
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Страница после Telegram Login Widget (`?next=connect.html`). Только безопасные имена *.html */
+function resolveTelegramLoginLanding(nextRaw: string): string {
+  const def = (process.env.PRODUCT_CABINET_PATH?.trim() || "cabinet.html").replace(/^\//, "");
+  const n = nextRaw.trim().replace(/^\//, "");
+  if (!n) return def;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.html$/.test(n)) return def;
+  return n;
+}
+
 /** Публичные данные для встраивания Telegram Login Widget (без секретов). */
 r.get("/bootstrap-public", (_req, res) => {
   const username = process.env.PRODUCT_BOT_USERNAME?.trim().replace(/^@/, "") || "";
@@ -45,13 +54,16 @@ r.get(
   "/telegram-callback",
   asyncHandler(async (req, res) => {
     const flat = flattenQueryStringRecord(req.query as Record<string, unknown>);
+    const landingHtml = resolveTelegramLoginLanding(String(flat.next ?? ""));
+    const verifyFlat = { ...flat };
+    delete verifyFlat.next;
+
     const botToken = process.env.PRODUCT_BOT_TOKEN?.trim();
-    const cabFile = (process.env.PRODUCT_CABINET_PATH?.trim() || "cabinet.html").replace(/^\//, "");
     const base = (process.env.PRODUCT_PUBLIC_BASE_URL || process.env.CABINET_PUBLIC_URL || "").replace(/\/$/, "");
 
     const redirectWith = (query: Record<string, string>) => {
       const sp = new URLSearchParams(query).toString();
-      const rel = `/${cabFile}${sp ? `?${sp}` : ""}`;
+      const rel = `/${landingHtml}${sp ? `?${sp}` : ""}`;
       res.redirect(302, base ? `${base}${rel}` : rel);
     };
 
@@ -59,7 +71,7 @@ r.get(
       redirectWith({ tg_err: "no_bot_token" });
       return;
     }
-    if (!verifyTelegramLoginWidget(flat, botToken)) {
+    if (!verifyTelegramLoginWidget(verifyFlat, botToken)) {
       redirectWith({ tg_err: "bad_signature" });
       return;
     }

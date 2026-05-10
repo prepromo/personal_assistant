@@ -88,6 +88,8 @@ r.post("/session", asyncHandler(async (req, res) => {
 r.post("/link-telegram-user-to-account", asyncHandler(async (req, res) => {
   const appUserId = String(req.body?.appUserId || "").trim();
   const telegramUserId = String(req.body?.telegramUserId ?? "").trim();
+  /** ID человека в переписке с Bot API (ctx.from.id). Иначе для веб-кабинета не передаётся. */
+  const bindingTelegramUserId = String(req.body?.bindingTelegramUserId ?? "").trim();
   if (!appUserId || !telegramUserId) {
     res.status(400).json({ error: "appUserId и telegramUserId обязательны" });
     return;
@@ -97,10 +99,14 @@ r.post("/link-telegram-user-to-account", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "TgAccount не найден для appUserId" });
     return;
   }
-  const oldGuestAppUserId = `bot-${telegramUserId}`;
+  const guestMigrateKey = bindingTelegramUserId || telegramUserId;
+  const oldGuestAppUserId = `bot-${guestMigrateKey}`;
+  const bindingRowTelegramId = bindingTelegramUserId || telegramUserId;
 
   await prisma.$transaction(async (tx) => {
-    const existing = await tx.tgBotUserBinding.findUnique({ where: { telegramUserId } });
+    const existing = await tx.tgBotUserBinding.findUnique({
+      where: { telegramUserId: bindingRowTelegramId },
+    });
     const metaToKeep = existing?.metaJson && existing.metaJson !== "{}" ? existing.metaJson : "{}";
 
     await tx.task.updateMany({
@@ -138,9 +144,9 @@ r.post("/link-telegram-user-to-account", asyncHandler(async (req, res) => {
     });
 
     await tx.tgBotUserBinding.upsert({
-      where: { telegramUserId },
+      where: { telegramUserId: bindingRowTelegramId },
       create: {
-        telegramUserId,
+        telegramUserId: bindingRowTelegramId,
         appUserId,
         metaJson: metaToKeep,
       },
@@ -151,7 +157,7 @@ r.post("/link-telegram-user-to-account", asyncHandler(async (req, res) => {
     });
   });
 
-  res.json({ ok: true, appUserId, telegramUserId, accountId: acc.id });
+  res.json({ ok: true, appUserId, telegramUserId, bindingTelegramUserId: bindingRowTelegramId, accountId: acc.id });
 }));
 
 /** Отдать расшифрованную сессию воркеру (только localhost + коннектор-секрет) */

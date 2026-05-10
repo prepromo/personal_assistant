@@ -64,12 +64,7 @@ import {
 } from "../lib/noteReminderLimits.js";
 import { formatTaskLine, listComradeTasksForBucket, type TaskDashboardBucket } from "../lib/comradeTaskService.js";
 import { REQUEST_TEMPLATES_HELP_TEXT } from "../lib/productBotRequestTemplates.js";
-import {
-  needsTelegramMtprotoLogin,
-  mtprotoPassword,
-  mtprotoSendCode,
-  mtprotoSignIn,
-} from "../lib/mtprotoLoginService.js";
+import { needsTelegramMtprotoLogin } from "../lib/mtprotoLoginService.js";
 import { getCabinetSubscription, subscriptionGrantsPaidFeatures } from "../lib/cabinetSubscription.js";
 import {
   activateAfterTelegramInvoicePayment,
@@ -123,7 +118,7 @@ async function emptyTgDialogsHint(telegramUserId: number | undefined): Promise<s
   }
   const acc = await getAccountForTelegramUser(telegramUserId);
   if (!acc) {
-    return "Сначала **`/connect`** в этом чате (номер и код из Telegram) или в веб-кабинете.";
+    return "Сначала подключите личный Telegram: **`/connect`** в боте (ссылка на сайт) или блок «Личный Telegram» в **веб-кабинете**.";
   }
   const tg = await prisma.tgAccount.findUnique({
     where: { id: acc.accountId },
@@ -144,7 +139,9 @@ async function emptyTgDialogsHint(telegramUserId: number | undefined): Promise<s
 
 async function replyTelegramConnectOffer(ctx: Context): Promise<void> {
   const kb = new InlineKeyboard()
-    .text("Подключить личный Telegram", "mtp:start")
+    .url("Открыть подключение Telegram", getCabinetConnectPageUrl())
+    .row()
+    .text("Подсказка в боте", "mtp:start")
     .row()
     .text("Отмена", "mtp:cancel");
   await ctx.reply(
@@ -153,22 +150,10 @@ async function replyTelegramConnectOffer(ctx: Context): Promise<void> {
       "",
       "Без этого не будут видны диалоги и не заработают автоответы **с вашего аккаунта**.",
       "",
-      "Нажмите кнопку и введите **номер** (`+7…`), затем **код** из Telegram. Сообщения с номером, кодом и паролем бот **старается удалить** из чата после обработки.",
+      "**Код входа не вводите в этом чате** — по кнопке откроется страница подключения в браузере; войдите и введите номер и код **только там**.",
     ].join("\n"),
     { parse_mode: "Markdown", reply_markup: kb },
   );
-}
-
-/** Удаляет сообщение пользователя (номер/код/пароль), если API позволяет. */
-async function deleteUserMessageIfPossible(ctx: Context): Promise<void> {
-  const chatId = ctx.chat?.id;
-  const mid = ctx.message?.message_id;
-  if (chatId === undefined || mid === undefined) return;
-  try {
-    await ctx.api.deleteMessage(chatId, mid);
-  } catch {
-    /* нет прав или слишком старое сообщение */
-  }
 }
 
 function isActiveMtprotoWizard(meta: Pick<DialogMeta, "step">): boolean {
@@ -183,26 +168,6 @@ function mtprotoWizardPatchOrIdle(
     return { step: meta.step, mtprotoDraft: meta.mtprotoDraft };
   }
   return { step: "idle", mtprotoDraft: undefined };
-}
-
-function mtprotoSignInUserHint(errMsg: string): string | null {
-  const u = errMsg.toUpperCase();
-  if (u.includes("PHONE_CODE_HASH_EMPTY") || u.includes("WIZARD_CORRUPT_PHONE_CODE_HASH")) {
-    return "Сервер не смог сопоставить код с запросом (часто после сбоя или двойного запроса). Нажмите **`/connect`** и введите **номер ещё раз**, затем **новый** код.";
-  }
-  if (u.includes("PHONE_CODE_EXPIRED") || u.includes("PHONE_CODE_INVALID")) {
-    return "Telegram не принял код. Нажмите **`/connect`**, введите **номер снова** и затем **только что пришедший** код (один запрос — один код).";
-  }
-  if (u.includes("CODE_MUST_BE") || u.includes("code_must_be")) {
-    return "Нужны **ровно 5 или 6 цифр** кода подряд.";
-  }
-  if (u.includes("NO_PENDING_LOGIN") || u.includes("SEND_CODE_FIRST")) {
-    return "Сессия входа сброшена. Начните снова: **`/connect`** и номер.";
-  }
-  if (u.includes("SIGNUP") || u.includes("TERMS_OF_SERVICE")) {
-    return "Этот номер в Telegram ещё не оформлен как аккаунт или ждёт соглашение в официальном клиенте. Один раз войдите в **официальный Telegram** с этого номера, затем снова **`/connect`**.";
-  }
-  return null;
 }
 
 async function beginMtprotoConnectWizard(ctx: Context): Promise<void> {
@@ -224,22 +189,35 @@ async function beginMtprotoConnectWizard(ctx: Context): Promise<void> {
     return;
   }
   const prev = await getDialogMeta(uid);
-  await setDialogMeta(uid, {
-    step: "mtproto_phone",
-    mtprotoDraft: undefined,
-    productChatHistory: prev.productChatHistory,
-    onboardingDone: prev.onboardingDone,
-    onboardingStep: prev.onboardingStep,
-  });
+  if (isActiveMtprotoWizard(prev)) {
+    await resetDialogFsm(uid);
+  }
+  const localityHint =
+    getProductPublicBaseUrl().includes("127.0.0.1") || getProductPublicBaseUrl().includes("localhost")
+      ? [
+          "",
+          "⚠️ В `.env` сейчас **локальный** адрес — откройте страницу подключения с того же ПК, где запущен API, или задайте **`PRODUCT_PUBLIC_BASE_URL`** на ваш `https://…`.",
+        ].join("\n")
+      : "";
+  const kb = new InlineKeyboard()
+    .url("Открыть подключение Telegram", getCabinetConnectPageUrl())
+    .row()
+    .text("« Меню", "menu:noop");
   await ctx.reply(
     [
       "**Подключение личного Telegram**",
       "",
-      "Одним сообщением пришлите **номер** в формате `+79991234567`.",
-      "Код придёт в Telegram — **следующим сообщением** только цифры кода.",
-      "При 2FA — следующим сообщением **пароль**.",
+      "**Не вводите код входа в этом чате с ботом** — Telegram может заблокировать вход (антифрод).",
+      "",
+      "Нажмите кнопку ниже — откроется **отдельная страница в браузере** (если видите только Telegram — выберите «Открыть во внешнем браузере» при необходимости).",
+      "",
+      "1. Войдите на сайте (**email / пароль** или **«Вход через Telegram»**).",
+      "2. На этой же странице введите номер `+7…`, код из приложения Telegram и при необходимости пароль **2FA**.",
+      "",
+      "После входа запустите **worker** рядом с API — подтянутся диалоги. Полный функционал — в «Полный кабинет» на странице.",
+      localityHint,
     ].join("\n"),
-    { parse_mode: "Markdown", reply_markup: mainMenu() },
+    { parse_mode: "Markdown", reply_markup: kb },
   );
 }
 
@@ -258,6 +236,12 @@ function getCabinetHtmlUrl(): string {
   return `${getProductPublicBaseUrl()}/${path}`;
 }
 
+/** Отдельная страница подключения личного Telegram (favicon, свой заголовок). */
+function getCabinetConnectPageUrl(): string {
+  const path = (process.env.PRODUCT_CONNECT_PATH?.trim() || "connect.html").replace(/^\//, "");
+  return `${getProductPublicBaseUrl()}/${path}`;
+}
+
 function formatCabinetCard(appUserId: string): string {
   const base = getProductPublicBaseUrl();
   const url = getCabinetHtmlUrl();
@@ -266,7 +250,7 @@ function formatCabinetCard(appUserId: string): string {
     "📱 **Сводка (всё можно в боте)**",
     "",
     "**Тариф:** `/pay` — тест или оплата в Telegram (если настроены Stars / провайдер).",
-    "**Личный Telegram:** `/connect` или кнопка при запросе в разделах.",
+    "**Личный Telegram:** `/connect` — страница **connect.html** на вашем сервере (номер и код только там).",
     "",
     isGuestBotId
       ? "Статус: **гостевой** — `/register`, затем `/pay` и `/connect`."
@@ -346,7 +330,7 @@ async function replyRegistrationWizardEntry(ctx: Context) {
       "**appUserId** (тех.данные):",
       `\`${r.appUserId}\``,
       "",
-      "Дальше: **`/pay`** (если нужно) и **`/connect`** — телефон и код в этом чате.",
+      "Дальше: **`/pay`** (если нужно) и **`/connect`** — откроется кабинет на сайте, там номер и код.",
       extra,
     ].join("\n"),
     { parse_mode: "Markdown", reply_markup: mainMenu() },
@@ -366,7 +350,7 @@ const ONBOARDING_STEPS = [
     "",
     "**`/register`** — создать аккаунт и получить доступ к функциям.",
     "**`/pay`** — тариф (на сервере может быть тестовый режим, Stars или другой провайдер).",
-    "**`/connect`** — вход вашего **личного Telegram** (номер → код); рядом с API должен работать **worker**, чтобы подтянуть список чатов.",
+    "**`/connect`** — ссылка на **веб-кабинет**: номер и код входа **только на сайте**, не в чате с ботом; для диалогов нужен **worker** рядом с API.",
     "",
     "Меню внизу открывает разделы; полный список команд — кнопка **«Команды»** или **`/help`**.",
   ].join("\n"),
@@ -391,13 +375,13 @@ const START_RETURNING_USER_TEXT = [
 const POST_COURSE_FOLLOWUP_TEXT = [
   "🔐 **Зачем нужен личный Telegram**",
   "",
-  "Чтобы я мог помогать **с вашими реальными переписками** — видеть нужные диалоги и по вашему подтверждению отправлять сообщения **от вашего имени**, нужен **один раз** вход вашего аккаунта через **`/connect`** в этом чате (номер → код из приложения Telegram).",
+  "Чтобы я мог работать **с вашими диалогами** и по подтверждению писать **от вашего имени**, один раз нужно подключить аккаунт: **`/connect`** → откроется **веб-кабинет** → блок **«Личный Telegram»** — номер и код **только в форме на сайте**, не в этом чате (так безопаснее и реже блокирует Telegram).",
   "",
-  "**Заметки и напоминания здесь** работают без этого. Подключение нужно именно для **задач на контактов** из вашего списка чатов.",
+  "**Заметки и напоминания здесь** работают без этого. Подключение нужно для **задач по контактам** и списка чатов.",
   "",
-  "**Тариф:** если доступ ещё не оформлен — **`/register`**, затем при необходимости **`/pay`** (как настроено на сервере). **`/id`** — технический идентификатор для поддержки.",
+  "**Тариф:** при необходимости **`/register`**, **`/pay`**. **`/id`** — тех. идентификатор.",
   "",
-  "Список личных чатов подтягивает **worker** рядом с API после успешного входа.",
+  "Список чатов в базе заполняет **worker** рядом с API после входа.",
 ].join("\n");
 
 const HELP_TEXT = [
@@ -409,7 +393,7 @@ const HELP_TEXT = [
   "",
   "**/register** — аккаунт в боте.",
   "**/pay** — тариф (тест `BILLING_ALLOW_SIMULATED_PAYMENT=1`, либо Stars, либо провайдер).",
-  "**/connect** — личный Telegram. Исходящие контактам — **только после подтверждения** в этом боте.",
+  "**/connect** — ссылка на сайт для входа личного Telegram (номер и код **в кабинете**, не в чате). Исходящие — **только после подтверждения** здесь.",
   "",
   "**/agents**, **/notes**, **/agent** — разделы «Агенты», «Заметки», политика агента.",
   "**/id** — тех. данные. **/cancel** — выход из мастера напоминания.",
@@ -468,7 +452,10 @@ async function replyPostCourseConnectExplainer(
   const uid = ctx.from?.id;
   if (uid === undefined) return;
   const { appUserId } = await ensureBotBinding(uid);
-  const connectKb = new InlineKeyboard().text("Подключить личный Telegram", "mtp:start");
+  const connectKb = new InlineKeyboard()
+    .url("Открыть подключение Telegram", getCabinetConnectPageUrl())
+    .row()
+    .text("Подсказка в боте", "mtp:start");
   if (await needsTelegramMtprotoLogin(appUserId)) {
     const photoPath = opts?.skipIllustration ? null : absPostCoursePhoto();
     const cap = telegramPhotoCaption(POST_COURSE_FOLLOWUP_TEXT);
@@ -643,7 +630,7 @@ async function showAgentSettingsPanel(ctx: Context, useEdit: boolean): Promise<v
       [
         "Личный Telegram для этого аккаунта ещё не привязан.",
         "",
-        "Выполните **`/connect`** здесь или подключите аккаунт в **веб-кабинете** — затем откроются политика и список чатов.",
+        "Выполните **`/connect`** (ссылка на кабинет) и подключите аккаунт **на сайте** — затем откроются политика и список чатов.",
       ].join("\n"),
       { parse_mode: "Markdown", reply_markup: mainMenu() },
     );
@@ -1038,9 +1025,9 @@ async function showChatsHub(ctx: Context, page: number, edit: boolean): Promise<
   if (!acc) {
     await ctx.reply(
       [
-        "Чтобы настраивать чаты по личному Telegram, сначала подключите аккаунт: **`/connect`** в этом чате (номер и код) или вход в **веб-кабинете**.",
+        "Чтобы настраивать чаты по личному Telegram, подключите аккаунт: **`/connect`** → кабинет на сайте → блок «Личный Telegram» (номер и код **только в форме на сайте**).",
         "",
-        "Если вы только что ввели код, но здесь всё ещё «не подключено» — перезапустите бота/API или проверьте, что вы в том же боте и том же Telegram-профиле.",
+        "Если только что подключились на сайте, а здесь ещё «не подключено» — обновите страницу кабинета или подождите минуту; при необходимости перезапустите API.",
       ].join("\n"),
       { parse_mode: "Markdown", reply_markup: mainMenu() },
     );
@@ -2907,15 +2894,16 @@ export function createProductBot(token: string): Bot {
 
     let meta = await getDialogMeta(uid);
 
+    if (isActiveMtprotoWizard(meta)) {
+      await resetDialogFsm(uid);
+      await beginMtprotoConnectWizard(ctx);
+      return;
+    }
+
     // Свободный диалог: сброс только если ждём явных кнопок (подтверждение NL при PRODUCT_BOT_NL_CONFIRM=1, и т.д.)
     const nlAwaitingButtons =
       isProductBotNlConfirmRequired() && (meta.step === "nl_confirm" || meta.step === "nl_pick_chats");
-    if (
-      meta.step !== "mtproto_phone" &&
-      meta.step !== "mtproto_code" &&
-      meta.step !== "mtproto_2fa" &&
-      (nlAwaitingButtons || meta.step === "rem_confirm" || meta.step === "agent_confirm")
-    ) {
+    if (nlAwaitingButtons || meta.step === "rem_confirm" || meta.step === "agent_confirm") {
       await resetDialogFsm(uid);
       meta = await getDialogMeta(uid);
     }
@@ -2950,142 +2938,6 @@ export function createProductBot(token: string): Bot {
         ["Подтвердите отправку с вашего личного аккаунта:", "", t.slice(0, 3500)].join("\n"),
         { reply_markup: outboundConfirmKeyboard() },
       );
-      return;
-    }
-
-    if (meta.step === "mtproto_phone") {
-      let phone = text
-        .replace(/\s/g, "")
-        .replace(/\u00a0/g, "")
-        .replace(/-/g, "")
-        .replace(/[()]/g, "");
-      if (/^8\d{10}$/.test(phone)) phone = `+7${phone.slice(1)}`;
-      if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
-        await ctx.reply("Введите номер: `+79991234567` или российский `89991234567`.", {
-          parse_mode: "Markdown",
-        });
-        return;
-      }
-      const { appUserId } = await ensureBotBinding(uid);
-      if (!(await needsTelegramMtprotoLogin(appUserId))) {
-        await resetDialogFsm(uid);
-        await ctx.reply(
-          [
-            "Личный Telegram **уже подключён** — код не нужен.",
-            "",
-            "Если список чатов пустой — это **не ошибка входа**; отдельно запустите **worker** (`telegram-user/scripts/start-worker.ps1`).",
-          ].join("\n"),
-          { parse_mode: "Markdown", reply_markup: mainMenu() },
-        );
-        return;
-      }
-      try {
-        await mtprotoSendCode(appUserId, phone);
-        await deleteUserMessageIfPossible(ctx);
-        await setDialogMeta(uid, {
-          step: "mtproto_code",
-          mtprotoDraft: { phone },
-          productChatHistory: meta.productChatHistory,
-        });
-        await ctx.reply(
-          "Код отправлен в Telegram. **Следующим сообщением** пришлите только цифры кода (обычно 5).",
-          { parse_mode: "Markdown" },
-        );
-      } catch (e) {
-        await ctx.reply(e instanceof Error ? e.message : "Ошибка отправки кода", { reply_markup: mainMenu() });
-      }
-      return;
-    }
-
-    if (meta.step === "mtproto_code") {
-      const code = text.replace(/\D/g, "");
-      if (!/^\d{5,6}$/.test(code)) {
-        await ctx.reply(
-          "Введите код из Telegram: **5 или 6 цифр** (можно вставить строку с текстом — оставим только цифры).",
-          { parse_mode: "Markdown" },
-        );
-        return;
-      }
-      const { appUserId } = await ensureBotBinding(uid);
-      if (!(await needsTelegramMtprotoLogin(appUserId))) {
-        await resetDialogFsm(uid);
-        await setDialogMeta(uid, { onboardingDone: true });
-        await ctx.reply(
-          [
-            "Личный Telegram **уже был подключён** — шаг с кодом отменён.",
-            "",
-            "Для синхронизации диалогов при необходимости запустите **worker** отдельно от бота.",
-          ].join("\n"),
-          { parse_mode: "Markdown", reply_markup: mainMenu() },
-        );
-        return;
-      }
-      try {
-        const r2 = await mtprotoSignIn(appUserId, code);
-        await deleteUserMessageIfPossible(ctx);
-        if (r2.needPassword) {
-          await setDialogMeta(uid, {
-            step: "mtproto_2fa",
-            productChatHistory: meta.productChatHistory,
-          });
-          await ctx.reply(
-            "Введите **пароль двухфакторной защиты** Telegram одним сообщением (его видите только вы).",
-            { parse_mode: "Markdown" },
-          );
-          return;
-        }
-        await resetDialogFsm(uid);
-        await setDialogMeta(uid, { onboardingDone: true });
-        await ctx.reply(
-          [
-            "**Готово** — личный Telegram подключён, сессия сохранена.",
-            "",
-            "Чтобы **список чатов** появился в боте, в другом терминале запустите **worker** на той же машине, что API (`telegram-user/scripts/start-worker.ps1`). Остальные разделы можно пользовать и без него.",
-          ].join("\n"),
-          { parse_mode: "Markdown", reply_markup: mainMenu() },
-        );
-      } catch (e) {
-        await deleteUserMessageIfPossible(ctx);
-        const raw = e instanceof Error ? e.message : "Ошибка входа";
-        const hint = mtprotoSignInUserHint(raw);
-        if (hint) {
-          await setDialogMeta(uid, {
-            step: "mtproto_phone",
-            mtprotoDraft: undefined,
-            productChatHistory: meta.productChatHistory,
-          });
-          await ctx.reply(hint, { parse_mode: "Markdown", reply_markup: mainMenu() });
-        } else {
-          await ctx.reply(raw, { reply_markup: mainMenu() });
-        }
-      }
-      return;
-    }
-
-    if (meta.step === "mtproto_2fa") {
-      const pwd = text.trim();
-      if (!pwd) {
-        await ctx.reply("Введите непустой пароль.");
-        return;
-      }
-      const { appUserId } = await ensureBotBinding(uid);
-      try {
-        await mtprotoPassword(appUserId, pwd);
-        await deleteUserMessageIfPossible(ctx);
-        await resetDialogFsm(uid);
-        await setDialogMeta(uid, { onboardingDone: true });
-        await ctx.reply(
-          [
-            "**Готово** — личный Telegram подключён.",
-            "",
-            "Для **синхронизации диалогов** запустите **worker** отдельно (`telegram-user/scripts/start-worker.ps1`).",
-          ].join("\n"),
-          { parse_mode: "Markdown", reply_markup: mainMenu() },
-        );
-      } catch (e) {
-        await deleteUserMessageIfPossible(ctx);
-        await ctx.reply(e instanceof Error ? e.message : "Ошибка пароля", { reply_markup: mainMenu() });
-      }
       return;
     }
 

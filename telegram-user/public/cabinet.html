@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Кабинет — Telegram User</title>
+  <title>Кабинет — Comrade AI</title>
+  <link rel="icon" type="image/png" href="/favicon.png" sizes="32x32" />
+  <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/favicon.png" />
   <style>
     :root {
       --bg: #0c1017;
@@ -114,7 +117,7 @@
     <ol>
       <li><strong>Сайт — регистрация.</strong> Email и пароль (ниже) или «Вход через Telegram». Система сама выдаёт <code>appUserId</code>. После регистрации на сайте — <strong>1 день бесплатного доступа</strong> (подключение личного Telegram и функции кабинета).</li>
       <li><strong>Сайт — тариф.</strong> После триала — <strong>500 ₽ за месяц</strong>. Оплата через ЮKassa / ЮMoney (кнопка в блоке «Статус»). На стенде без ЮKassa — тестовая кнопка при <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>. Досрочная оплата во время триала тоже возможна.</li>
-      <li><strong>Личный Telegram.</strong> В кабинете блок «Личный Telegram» или в боте: номер <code>+7…</code> → код из Telegram → при необходимости пароль 2FA. На сервере должен работать <strong>worker</strong> — тогда появятся диалоги и автоответы.</li>
+      <li><strong>Личный Telegram.</strong> Удобнее страница <a href="/connect.html"><code>/connect.html</code></a> (команда <code>/connect</code> в боте). Здесь — блок «Личный Telegram» слева. Номер <code>+7…</code> → код → при необходимости 2FA. <strong>Не вводите код боту в чат.</strong> Нужен <strong>worker</strong> на сервере.</li>
     </ol>
     <p class="note" style="margin-bottom:0">Док: <a href="/docs/USER-TURN.md" target="_blank" rel="noopener">USER-TURN</a>, <a href="/docs/AUTOMATION.md" target="_blank" rel="noopener">AUTOMATION</a>. В @BotFather: <code>/setdomain</code> для виджета входа.</p>
   </div>
@@ -148,9 +151,9 @@
     <div class="row-main">
     <aside>
       <p class="note" id="tgStatus"></p>
-      <div id="mtprotoPanel" style="display:none;border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin:0.75rem 0;background:#0e1520;">
+      <div id="cabinet-mtproto" style="display:none;border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin:0.75rem 0;background:#0e1520;scroll-margin-top:1rem;">
         <strong style="font-size:0.95rem;">Личный Telegram</strong>
-        <p class="note" style="margin-top:0.35rem">Подключение как в обычном входе: номер <code>+7…</code> → код в Telegram → при необходимости пароль 2FA. Нужны <code>TELEGRAM_API_ID</code> / <code>TELEGRAM_API_HASH</code> в <code>connector/.env</code> на сервере.</p>
+        <p class="note" style="margin-top:0.35rem">Введите номер и код <strong>только здесь</strong> (не отправляйте код боту в Telegram — возможна блокировка входа). Формат: <code>+7…</code> → код из приложения Telegram → при необходимости пароль 2FA. На сервере: <code>TELEGRAM_API_ID</code> / <code>TELEGRAM_API_HASH</code> в <code>connector/.env</code>.</p>
         <label>Телефон</label>
         <input id="mtpPhone" type="tel" placeholder="+79991234567" autocomplete="tel" />
         <button type="button" id="btnMtpSendCode" style="margin-top:0.35rem">Отправить код</button>
@@ -215,8 +218,29 @@
     </section>
   </main>
 
+  <!--
+    Деплой: кабинет вызывает /api/v1/* по относительному пути — это работает только если страница
+    открыта с того же хоста, что и telegram-user (Express раздаёт public/). На голом GitHub Pages
+    API нет → будет 404.
+
+    Варианты: (1) Открывать кабинет по URL вашего сервера: https://ВАШ_API/cabinet.html
+    (2) Положить HTML на статику, перед основным скриптом добавить:
+        <script>window.__CABINET_API_ORIGIN__="https://ВАШ_API";</script>
+    и в .env API указать CORS_ORIGINS с origin статики (через запятую).
+
+    CSP img-src data: на хостинге режет картинки ЮKassa/виджетов → ослабьте img-src в настройках
+    CDN/nginx (добавьте https://yastatic.net https://telegram.org …) или не задавайте жёсткий CSP.
+  -->
   <script>
     const $ = (id) => document.getElementById(id);
+    const CABINET_API_ORIGIN =
+      typeof window !== "undefined" && window.__CABINET_API_ORIGIN__
+        ? String(window.__CABINET_API_ORIGIN__).replace(/\/$/, "")
+        : "";
+    function apiUrl(path) {
+      if (!path || path.startsWith("http://") || path.startsWith("https://")) return path;
+      return CABINET_API_ORIGIN + path;
+    }
     function apiHeaders() {
       const h = { "Content-Type": "application/json" };
       const t = sessionStorage.getItem("cabinet_token");
@@ -224,7 +248,7 @@
       return h;
     }
     const api = (path, opts = {}) =>
-      fetch(path, {
+      fetch(apiUrl(path), {
         credentials: "include",
         headers: { ...apiHeaders(), ...(opts.headers || {}) },
         ...opts,
@@ -267,7 +291,7 @@
       if (!fc || !data) return;
       let boot = {};
       try {
-        const r = await fetch("/api/v1/auth/bootstrap-public");
+        const r = await fetch(apiUrl("/api/v1/auth/bootstrap-public"));
         boot = await r.json();
       } catch (_) {}
       const botName = boot.telegramBotUsername || "";
@@ -435,8 +459,17 @@
       }
     }
 
+    function scrollToCabinetMtprotoIfNeeded() {
+      try {
+        if (location.hash.replace(/^#/, "") !== "cabinet-mtproto") return;
+        const el = document.getElementById("cabinet-mtproto");
+        if (!el || el.style.display === "none") return;
+        setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 250);
+      } catch (_) {}
+    }
+
     async function syncMtprotoPanel() {
-      const panel = $("mtprotoPanel");
+      const panel = $("cabinet-mtproto");
       const pwdBlock = $("mtpPwdBlock");
       const st = $("mtpStatus");
       if (!panel || !pwdBlock || !st) return;
@@ -454,7 +487,7 @@
         return;
       }
       panel.style.display = "block";
-      st.textContent = "Введите номер в формате +7… и подтвердите код из Telegram.";
+      st.textContent = "Введите номер (+7…) и код только в полях ниже — не отправляйте код боту.";
     }
 
     function bindMtprotoHandlers() {
@@ -557,6 +590,7 @@
       await fetchDialogs();
       loadChat();
       startPoll();
+      scrollToCabinetMtprotoIfNeeded();
     }
 
     function showAuth() {
@@ -868,7 +902,7 @@
       const m = $("telegram-widget-mount");
       if (!m) return;
       try {
-        const r = await fetch("/api/v1/auth/bootstrap-public");
+        const r = await fetch(apiUrl("/api/v1/auth/bootstrap-public"));
         const j = await r.json();
         if (!j.telegramLoginAvailable || !j.telegramBotUsername) {
           m.innerHTML =
@@ -880,7 +914,12 @@
         s.async = true;
         s.setAttribute("data-telegram-login", j.telegramBotUsername);
         s.setAttribute("data-size", "large");
-        s.setAttribute("data-auth-url", location.origin + "/api/v1/auth/telegram-callback");
+        s.setAttribute(
+          "data-auth-url",
+          (CABINET_API_ORIGIN || location.origin) +
+            "/api/v1/auth/telegram-callback?" +
+            new URLSearchParams({ next: "cabinet.html" }).toString(),
+        );
         m.appendChild(s);
       } catch {
         m.textContent = "Не удалось загрузить виджет входа.";
@@ -918,6 +957,12 @@
       } else {
         showAuth();
         await mountTelegramLoginWidget();
+        if (location.hash.replace(/^#/, "") === "cabinet-mtproto") {
+          const ae = $("authErr");
+          if (ae && !ae.textContent)
+            ae.textContent =
+              "Войдите на сайт — затем слева откроется блок «Личный Telegram» для номера и кода (не отправляйте код боту).";
+        }
       }
     })();
   </script>

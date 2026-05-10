@@ -147,6 +147,7 @@ app.listen(port, () => {
   console.log(`telegram-user API http://127.0.0.1:${port}`);
   console.log(`Start (MVP / кабинет) http://127.0.0.1:${port}/`);
   console.log(`Cabinet UI http://127.0.0.1:${port}/cabinet.html`);
+  console.log(`Connect (MTProto) http://127.0.0.1:${port}/connect.html`);
   console.log(`MVP debug UI http://127.0.0.1:${port}/mvp.html`);
   if (productBot && botMode === "polling") {
     void productBot.start({

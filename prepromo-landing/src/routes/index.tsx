@@ -3,12 +3,15 @@ import {
   MessageSquare, Bell, FileEdit, CheckCircle2, Sparkles, Send,
   Shield, Users, Briefcase, Rocket, ArrowRight, Bot, Search,
   Calendar, FileText, Target, Inbox, Globe, LayoutDashboard,
-  ChevronDown, Wallet,
+  ChevronDown, Wallet, Smartphone,
 } from "lucide-react";
 import { useState } from "react";
 import heroImg from "@/assets/hero.png";
 
 const TG = import.meta.env.VITE_TG_BOT_URL ?? "https://t.me/Test_agent_AI_companion_bot";
+/** На прод-сервере рядом с API (telegram-user): те же origin для кнопок без сбоев. При другом хосте задайте полный URL в env. */
+const CONNECT_URL = import.meta.env.VITE_SITE_CONNECT_URL ?? "/connect.html";
+const CABINET_URL = import.meta.env.VITE_SITE_CABINET_URL ?? "/cabinet.html";
 
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
@@ -27,16 +30,30 @@ function Nav() {
           </div>
           <span className="font-display font-bold text-lg">Comrade AI</span>
         </div>
-        <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
+        <nav className="hidden lg:flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#features" className="hover:text-foreground transition">Возможности</a>
           <a href="#how" className="hover:text-foreground transition">Как работает</a>
           <a href="#pricing" className="hover:text-foreground transition">Тариф</a>
           <a href="#roadmap" className="hover:text-foreground transition">Развитие</a>
           <a href="#faq" className="hover:text-foreground transition">FAQ</a>
+          <a href={CONNECT_URL} className="inline-flex items-center gap-1.5 text-foreground font-medium hover:text-primary transition">
+            <Smartphone className="w-4 h-4" /> Подключить
+          </a>
+          <a href={CABINET_URL} className="inline-flex items-center gap-1.5 text-foreground font-medium hover:text-primary transition">
+            <LayoutDashboard className="w-4 h-4" /> Кабинет
+          </a>
         </nav>
-        <a href={TG} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-primary text-primary-foreground text-sm font-medium shadow-soft hover:shadow-glow transition-all">
-          <Send className="w-4 h-4" /> Telegram
-        </a>
+        <div className="flex items-center gap-2 shrink-0">
+          <a href={CONNECT_URL} className="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card text-foreground hover:border-primary transition" title="Подключить Telegram" aria-label="Подключить Telegram">
+            <Smartphone className="w-5 h-5" />
+          </a>
+          <a href={CABINET_URL} className="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-full border border-border bg-card text-foreground hover:border-primary transition" title="Личный кабинет и оплата" aria-label="Личный кабинет и оплата">
+            <Wallet className="w-5 h-5" />
+          </a>
+          <a href={TG} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-primary text-primary-foreground text-sm font-medium shadow-soft hover:shadow-glow transition-all">
+            <Send className="w-4 h-4" /> Telegram
+          </a>
+        </div>
       </div>
     </header>
   );
@@ -73,6 +90,14 @@ function Hero() {
             </a>
             <a href="#features" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-card border border-border font-medium hover:border-primary transition">
               Посмотреть возможности <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <a href={CONNECT_URL} className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-sm font-medium hover:border-primary hover:shadow-soft transition">
+              <Smartphone className="w-4 h-4" /> Подключить личный Telegram
+            </a>
+            <a href={CABINET_URL} className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-sm font-medium hover:border-primary hover:shadow-soft transition">
+              <Wallet className="w-4 h-4" /> Регистрация и оплата
             </a>
           </div>
         </motion.div>
@@ -202,15 +227,23 @@ function Pricing() {
               </ul>
             </div>
           </div>
-          <a
-            href={TG}
-            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-gradient-primary text-primary-foreground font-semibold shadow-soft hover:shadow-glow transition-all whitespace-nowrap"
-          >
-            <Send className="w-5 h-5" /> Начать в Telegram
-          </a>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            <a
+              href={TG}
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-gradient-primary text-primary-foreground font-semibold shadow-soft hover:shadow-glow transition-all whitespace-nowrap"
+            >
+              <Send className="w-5 h-5" /> Начать в Telegram
+            </a>
+            <a
+              href={CABINET_URL}
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-card border-2 border-primary/30 text-foreground font-semibold hover:border-primary hover:bg-card/80 transition-all whitespace-nowrap"
+            >
+              <Wallet className="w-5 h-5" /> Кабинет и оплата
+            </a>
+          </div>
         </motion.div>
         <p className="text-center text-sm text-muted-foreground mt-8 max-w-2xl mx-auto">
-          Личный кабинет на сайте открывается после регистрации: там же видно срок триала и кнопку продления на месяц.
+          Личный кабинет на сайте открывается после регистрации: там же видно срок триала и кнопку продления на месяц. Подключение аккаунта Telegram — на странице «Подключить».
         </p>
       </div>
     </section>
@@ -330,7 +363,7 @@ function FAQ() {
     { q: "Сколько стоит и есть ли пробный период?", a: "После регистрации на сайте — 1 день бесплатного доступа. Затем подписка 500 ₽ за месяц; оплата через ЮKassa / ЮMoney в личном кабинете. Досрочно оплатить месяц можно и во время триала." },
     { q: "Comrade AI ведёт диалоги за меня?", a: "Он ведёт диалог как агент: читает контекст, предлагает следующий шаг и готовит текст. Отправка — только после вашего подтверждения." },
     { q: "Это автоответчик?", a: "Нет. Это агенты под конкретную цель (контакт/задача), которые действуют по контексту и сценарию. Автоотправки нет." },
-    { q: "Что нужно, чтобы агент работал в моих диалогах?", a: "Нужно один раз подключить Telegram через /connect — чтобы видеть ваши диалоги и готовить ответы по контексту." },
+    { q: "Что нужно, чтобы агент работал в моих диалогах?", a: "Нужно один раз подключить личный Telegram: из бота по команде /connect (ссылка на сайт) или со страницы «Подключить» на этом сайте — чтобы видеть диалоги и готовить ответы по контексту." },
     { q: "Это только Telegram-бот?", a: "Нет. Telegram — первый этап. Далее планируется WhatsApp, MAX, Avito, Email и единый web-интерфейс." },
     { q: "Можно ли удалять данные?", a: "Да. Вы можете управлять своими заметками, задачами и сохранённой информацией." },
     { q: "Что будет дальше?", a: "Развитие мультиплатформенности, web-кабинет, обработка постов и сообщений, выделение главного и персональные отчёты." },
@@ -366,9 +399,17 @@ function FinalCTA() {
         <div className="relative">
           <h2 className="text-4xl md:text-6xl font-bold text-primary-foreground mb-5">Запустите первого агента за 2 минуты</h2>
           <p className="text-lg text-primary-foreground/90 max-w-xl mx-auto mb-8">Опишите цель — получите первый черновик — подтвердите отправку.</p>
-          <a href={TG} className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-card text-foreground font-semibold shadow-elegant hover:scale-105 transition-transform">
-            <Send className="w-5 h-5" /> Попробовать в Telegram
-          </a>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <a href={TG} className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-card text-foreground font-semibold shadow-elegant hover:scale-105 transition-transform">
+              <Send className="w-5 h-5" /> Попробовать в Telegram
+            </a>
+            <a href={CONNECT_URL} className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-primary-foreground/15 text-primary-foreground border border-primary-foreground/40 font-semibold hover:bg-primary-foreground/25 transition">
+              <Smartphone className="w-5 h-5" /> Подключить Telegram
+            </a>
+            <a href={CABINET_URL} className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-primary-foreground/15 text-primary-foreground border border-primary-foreground/40 font-semibold hover:bg-primary-foreground/25 transition">
+              <Wallet className="w-5 h-5" /> Оплата в кабинете
+            </a>
+          </div>
         </div>
       </motion.div>
     </section>
@@ -385,7 +426,11 @@ function Footer() {
           </div>
           <span className="font-display font-semibold text-foreground">Comrade AI</span>
         </div>
-        <div>© {new Date().getFullYear()} Comrade AI. Все права защищены.</div>
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+          <a href={CONNECT_URL} className="hover:text-foreground transition">Подключить Telegram</a>
+          <a href={CABINET_URL} className="hover:text-foreground transition">Кабинет и оплата</a>
+          <span>© {new Date().getFullYear()} Comrade AI</span>
+        </div>
       </div>
     </footer>
   );

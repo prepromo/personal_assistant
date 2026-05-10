@@ -51,7 +51,8 @@ r.post(
       return;
     }
     try {
-      await mtprotoSendCode(u.appUserId, phone);
+      const forceResend = Boolean(req.body?.forceResend ?? req.body?.force_resend);
+      await mtprotoSendCode(u.appUserId, phone, forceResend);
       res.json({ ok: true, message: "Код отправлен в Telegram на этот номер." });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
