@@ -16,7 +16,8 @@
     "test:automation-prompt": "tsx scripts/test-automation-prompt.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "build:landing": "npm run build --prefix ../prepromo-landing && node ../prepromo-landing/scripts/sync-to-telegram-public.mjs",
-    "verify:local": "node scripts/verify-local.mjs"
+    "verify:local": "node scripts/verify-local.mjs",
+    "verify:billing": "node scripts/verify-billing-env.mjs"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

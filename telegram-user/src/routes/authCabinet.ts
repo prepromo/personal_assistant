@@ -13,6 +13,7 @@ import {
   subscriptionGrantsPaidFeatures,
 } from "../lib/cabinetSubscription.js";
 import { MONTHLY_PRICE_RUB, TRIAL_MS } from "../lib/billingPricing.js";
+import { yookassaTestPaymentsEnabled } from "../lib/yookassaClient.js";
 
 const defaultTgPolicyJson = JSON.stringify({
   sendAllowed: false,
@@ -351,6 +352,7 @@ r.get("/me", requireCabinetUser, async (req, res) => {
       yookassaConfigured: Boolean(
         process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim(),
       ),
+      yookassaTestPayments: yookassaTestPaymentsEnabled(),
     },
   });
 });

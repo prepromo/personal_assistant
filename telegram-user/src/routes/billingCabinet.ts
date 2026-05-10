@@ -12,6 +12,7 @@ import {
   yookassaConfigured,
   yookassaCreateRedirectPayment,
   yookassaGetPayment,
+  yookassaTestPaymentsEnabled,
 } from "../lib/yookassaClient.js";
 
 function simulatedPaymentAllowed(): boolean {
@@ -103,7 +104,7 @@ authed.get("/billing", async (req, res) => {
   const trialActive = sub.status === "trialing" && !!sub.trialEndsAt && sub.trialEndsAt > new Date();
   const paidActive =
     sub.status === "active" &&
-    (!sub.currentPeriodEnd || sub.currentPeriodEnd > now);
+    (!sub.currentPeriodEnd || sub.currentPeriodEnd > new Date());
   const hasAccess = subscriptionGrantsPaidFeatures(sub);
 
   res.json({
@@ -118,6 +119,7 @@ authed.get("/billing", async (req, res) => {
     nextPaymentDueAt: paidActive ? sub.currentPeriodEnd?.toISOString() ?? null : null,
     simulatedPaymentAvailable: simulatedPaymentAllowed(),
     yookassaConfigured: yookassaConfigured(),
+    yookassaTestPayments: yookassaTestPaymentsEnabled(),
   });
 });
 
@@ -151,6 +153,7 @@ authed.post("/billing/create-payment", async (req, res) => {
     res.json({
       confirmationUrl: created.confirmationUrl,
       paymentId: created.id,
+      testMode: yookassaTestPaymentsEnabled(),
     });
   } catch (e) {
     res.status(502).json({ error: e instanceof Error ? e.message : String(e) });

@@ -16,6 +16,12 @@ export type YooCreatePaymentResult = {
   confirmationUrl: string | null;
 };
 
+/** Тестовые платежи (`test: true` в теле запроса). Нужны ключи тестового магазина ЮKassa. См. https://yookassa.ru/developers/payment-acceptance/testing-and-going-live/testing */
+export function yookassaTestPaymentsEnabled(): boolean {
+  const v = process.env.YOOKASSA_TEST_PAYMENTS?.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
 export async function yookassaCreateRedirectPayment(opts: {
   amountRub: string;
   description: string;
@@ -24,6 +30,15 @@ export async function yookassaCreateRedirectPayment(opts: {
   idempotenceKey?: string;
 }): Promise<YooCreatePaymentResult> {
   const idempotenceKey = opts.idempotenceKey ?? randomUUID();
+  const body: Record<string, unknown> = {
+    amount: { value: opts.amountRub, currency: "RUB" },
+    confirmation: { type: "redirect", return_url: opts.returnUrl },
+    capture: true,
+    description: opts.description,
+    metadata: opts.metadata,
+  };
+  if (yookassaTestPaymentsEnabled()) body.test = true;
+
   const res = await fetch(`${API}/payments`, {
     method: "POST",
     headers: {
@@ -31,13 +46,7 @@ export async function yookassaCreateRedirectPayment(opts: {
       "Content-Type": "application/json",
       "Idempotence-Key": idempotenceKey,
     },
-    body: JSON.stringify({
-      amount: { value: opts.amountRub, currency: "RUB" },
-      confirmation: { type: "redirect", return_url: opts.returnUrl },
-      capture: true,
-      description: opts.description,
-      metadata: opts.metadata,
-    }),
+    body: JSON.stringify(body),
   });
   const raw = await res.text();
   if (!res.ok) {

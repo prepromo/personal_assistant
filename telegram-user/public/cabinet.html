@@ -350,6 +350,10 @@
             ? ': <a href="' + botHref + '" target="_blank" rel="noopener">@' + escHtml(botName) + "</a>"
             : "") +
           " — там тот же сценарий). Worker на сервере обязателен для синхронизации. Тех. id:";
+      const yooTestBanner =
+        bill.yookassaConfigured && bill.yookassaTestPayments
+          ? '<p class="note" style="margin:0 0 0.65rem;padding:0.5rem 0.65rem;background:#1a2838;border-radius:8px;border:1px solid var(--accent)">Режим <strong>тестовых</strong> платежей ЮKassa. Используйте ключи <strong>тестового</strong> магазина и карты из <a href="https://yookassa.ru/developers/payment-acceptance/testing-and-going-live/testing" target="_blank" rel="noopener">документации</a>.</p>'
+          : "";
       fc.innerHTML =
         "<h2>Статус: аккаунт и тариф</h2>" +
         '<div class="flow-step done"><span class="tag">Шаг 1</span><br/><strong>Регистрация</strong> — ' +
@@ -360,6 +364,7 @@
         '"><span class="tag">Шаг 2</span><br/><strong>Тариф</strong> (1 день бесплатно, затем ' +
         price +
         " ₽ / мес)" +
+        yooTestBanner +
         payBlock +
         "</div>" +
         '<div class="flow-step ' +
