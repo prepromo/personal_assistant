@@ -44,10 +44,10 @@ export async function activateSimulatedMonthlyForTelegramUser(
       error: "Тестовая оплата выключена. Задайте на сервере BILLING_ALLOW_SIMULATED_PAYMENT=1.",
     };
   }
-  if (process.env.YOOKASSA_SHOP_ID?.trim()) {
+  if (process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim()) {
     return {
       ok: false,
-      error: "На сервере задан YOOKASSA_SHOP_ID — тест из бота отключён. Уберите для стенда или оплатите через поддержку.",
+      error: "На сервере задана ЮKassa — тест из бота отключён. Уберите ключи для стенда или оплатите в кабинете.",
     };
   }
   const tid = String(telegramUserId);
@@ -69,6 +69,7 @@ export async function activateSimulatedMonthlyForTelegramUser(
     where: { cabinetUserId: cab.id },
     data: {
       status: "active",
+      trialEndsAt: null,
       currentPeriodEnd: nextEnd,
       planCode: "monthly_telegram_test",
     },
@@ -102,6 +103,7 @@ export async function activateAfterTelegramInvoicePayment(
     where: { cabinetUserId: cab.id },
     data: {
       status: "active",
+      trialEndsAt: null,
       currentPeriodEnd: nextEnd,
       planCode: "monthly_telegram_invoice",
     },

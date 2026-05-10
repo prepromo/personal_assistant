@@ -15,6 +15,7 @@ export async function respondSubscriptionRequired(
     subscription: {
       status: sub.status,
       planCode: sub.planCode,
+      trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
       currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
     },
   });

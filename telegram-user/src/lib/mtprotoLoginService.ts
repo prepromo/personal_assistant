@@ -1,5 +1,6 @@
 import { prisma } from "./prisma.js";
 import { runLoginWizard } from "./mtprotoLoginRunner.js";
+import { getCabinetSubscription, subscriptionGrantsPaidFeatures } from "./cabinetSubscription.js";
 
 const defaultTgPolicyJson = JSON.stringify({
   sendAllowed: false,
@@ -129,8 +130,8 @@ export async function mtprotoPassword(appUserId: string, password: string): Prom
 export async function subscriptionActiveForAppUserId(appUserId: string): Promise<boolean> {
   const cab = await prisma.cabinetUser.findUnique({ where: { appUserId } });
   if (!cab) return false;
-  const sub = await prisma.cabinetSubscription.findUnique({ where: { cabinetUserId: cab.id } });
-  return sub?.status === "active";
+  const sub = await getCabinetSubscription(cab.id, appUserId);
+  return subscriptionGrantsPaidFeatures(sub);
 }
 
 export async function needsTelegramMtprotoLogin(appUserId: string): Promise<boolean> {

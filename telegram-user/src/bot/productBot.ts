@@ -70,6 +70,7 @@ import {
   mtprotoSendCode,
   mtprotoSignIn,
 } from "../lib/mtprotoLoginService.js";
+import { getCabinetSubscription, subscriptionGrantsPaidFeatures } from "../lib/cabinetSubscription.js";
 import {
   activateAfterTelegramInvoicePayment,
   activateSimulatedMonthlyForTelegramUser,
@@ -110,8 +111,8 @@ async function shouldPromptTelegramConnect(telegramUserId: number): Promise<bool
   if (!b) return false;
   const cab = await prisma.cabinetUser.findUnique({ where: { appUserId: b.appUserId } });
   if (!cab) return false;
-  const sub = await prisma.cabinetSubscription.findUnique({ where: { cabinetUserId: cab.id } });
-  if (sub?.status !== "active") return false;
+  const sub = await getCabinetSubscription(cab.id, b.appUserId);
+  if (!subscriptionGrantsPaidFeatures(sub)) return false;
   return needsTelegramMtprotoLogin(b.appUserId);
 }
 

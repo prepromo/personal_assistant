@@ -3,7 +3,7 @@ import {
   MessageSquare, Bell, FileEdit, CheckCircle2, Sparkles, Send,
   Shield, Users, Briefcase, Rocket, ArrowRight, Bot, Search,
   Calendar, FileText, Target, Inbox, Globe, LayoutDashboard,
-  ChevronDown,
+  ChevronDown, Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import heroImg from "@/assets/hero.png";
@@ -30,6 +30,7 @@ function Nav() {
         <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
           <a href="#features" className="hover:text-foreground transition">Возможности</a>
           <a href="#how" className="hover:text-foreground transition">Как работает</a>
+          <a href="#pricing" className="hover:text-foreground transition">Тариф</a>
           <a href="#roadmap" className="hover:text-foreground transition">Развитие</a>
           <a href="#faq" className="hover:text-foreground transition">FAQ</a>
         </nav>
@@ -166,6 +167,56 @@ function HowItWorks() {
   );
 }
 
+function Pricing() {
+  return (
+    <section id="pricing" className="py-28 px-6">
+      <div className="max-w-5xl mx-auto">
+        <SectionTitle
+          kicker="Тариф"
+          title="Пробный день и помесячная подписка"
+          subtitle="Регистрация на сайте — 1 день бесплатно с полным доступом к кабинету и подключению личного Telegram. Дальше — 500 ₽ за месяц, оплата через ЮKassa / ЮMoney."
+        />
+        <motion.div
+          {...fadeUp}
+          className="rounded-[2rem] bg-card border border-border shadow-elegant p-10 md:p-14 flex flex-col md:flex-row md:items-center md:justify-between gap-8"
+        >
+          <div className="flex items-start gap-5">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-primary grid place-items-center shrink-0 shadow-soft">
+              <Wallet className="w-7 h-7 text-primary-foreground" />
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-2xl md:text-3xl mb-2">500 ₽ / месяц</h3>
+              <ul className="text-muted-foreground space-y-2 text-sm md:text-base">
+                <li className="flex gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <span><strong className="text-foreground">1 день бесплатно</strong> после регистрации на сайте</span>
+                </li>
+                <li className="flex gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <span>Подключение личного Telegram, агенты и черновики с подтверждением отправки</span>
+                </li>
+                <li className="flex gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <span>Оплата банковской картой и доступными способами через ЮKassa</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <a
+            href={TG}
+            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-gradient-primary text-primary-foreground font-semibold shadow-soft hover:shadow-glow transition-all whitespace-nowrap"
+          >
+            <Send className="w-5 h-5" /> Начать в Telegram
+          </a>
+        </motion.div>
+        <p className="text-center text-sm text-muted-foreground mt-8 max-w-2xl mx-auto">
+          Личный кабинет на сайте открывается после регистрации: там же видно срок триала и кнопку продления на месяц.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function UseCases() {
   const items = [
     { icon: MessageSquare, title: "Дожать отчёт / статус", desc: "Спросить, уточнить сроки и вернуться к вопросу, если нет ответа." },
@@ -276,6 +327,7 @@ function ForWhom() {
 
 function FAQ() {
   const qa = [
+    { q: "Сколько стоит и есть ли пробный период?", a: "После регистрации на сайте — 1 день бесплатного доступа. Затем подписка 500 ₽ за месяц; оплата через ЮKassa / ЮMoney в личном кабинете. Досрочно оплатить месяц можно и во время триала." },
     { q: "Comrade AI ведёт диалоги за меня?", a: "Он ведёт диалог как агент: читает контекст, предлагает следующий шаг и готовит текст. Отправка — только после вашего подтверждения." },
     { q: "Это автоответчик?", a: "Нет. Это агенты под конкретную цель (контакт/задача), которые действуют по контексту и сценарию. Автоотправки нет." },
     { q: "Что нужно, чтобы агент работал в моих диалогах?", a: "Нужно один раз подключить Telegram через /connect — чтобы видеть ваши диалоги и готовить ответы по контексту." },
@@ -347,6 +399,7 @@ export default function LandingPage() {
         <Hero />
         <Features />
         <HowItWorks />
+        <Pricing />
         <UseCases />
         <Security />
         <Roadmap />

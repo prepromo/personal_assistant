@@ -7,7 +7,12 @@ import { requireCabinetUser } from "../middleware/cabinetAuth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { verifyTelegramLoginWidget, flattenQueryStringRecord } from "../lib/telegramWidgetAuth.js";
 import { ensureGuestTgAccount } from "../lib/ensureGuestTgAccount.js";
-import { ensureCabinetSubscription, getCabinetSubscription } from "../lib/cabinetSubscription.js";
+import {
+  ensureCabinetSubscription,
+  getCabinetSubscription,
+  subscriptionGrantsPaidFeatures,
+} from "../lib/cabinetSubscription.js";
+import { MONTHLY_PRICE_RUB, TRIAL_MS } from "../lib/billingPricing.js";
 
 const defaultTgPolicyJson = JSON.stringify({
   sendAllowed: false,
@@ -164,8 +169,8 @@ r.post("/register", async (req, res) => {
 });
 
 /**
- * Регистрация с нуля на сайте: создаётся appUserId, TgAccount (до login в коннекторе) и подписка «ждёт оплаты».
- * Дальше: оплата в кабинете → коннектор с тем же appUserId.
+ * Регистрация с нуля на сайте: создаётся appUserId, TgAccount и подписка с 1 сутками триала (доступ к MTProto).
+ * После триала — оплата 500 ₽ / мес в кабинете (ЮKassa или тестовая кнопка).
  */
 r.post("/register-web", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
@@ -185,6 +190,7 @@ r.post("/register-web", async (req, res) => {
   }
   const appUserId = `user-${randomUUID()}`;
   const passwordHash = await hashPassword(password);
+  const trialEndsAt = new Date(Date.now() + TRIAL_MS);
   let user;
   try {
     user = await prisma.$transaction(async (tx) => {
@@ -202,8 +208,9 @@ r.post("/register-web", async (req, res) => {
       await tx.cabinetSubscription.create({
         data: {
           cabinetUserId: cab.id,
-          status: "pending_payment",
+          status: "trialing",
           planCode: "monthly",
+          trialEndsAt,
         },
       });
       return cab;
@@ -236,9 +243,10 @@ r.post("/register-web", async (req, res) => {
   res.status(201).json({
     user: { id: user.id, email: user.email, appUserId: user.appUserId },
     token,
+    trialEndsAt: trialEndsAt.toISOString(),
     nextSteps: [
-      "Оплатите тариф в блоке «Статус» на этой странице",
-      "Подключите личный Telegram: в кабинете блок «Личный Telegram» (телефон + код) или в боте по подсказке после оплаты",
+      "Бесплатно 1 день с момента регистрации — подключите личный Telegram в кабинете (блок «Личный Telegram» слева).",
+      `После окончания триала — ${MONTHLY_PRICE_RUB} ₽ за месяц в блоке «Статус» (оплата через ЮKassa / ЮMoney или тестовая кнопка на стенде).`,
     ],
   });
 });
@@ -300,7 +308,12 @@ r.get("/me", requireCabinetUser, async (req, res) => {
   const u = req.cabinetUser!;
   const tg = await prisma.tgAccount.findUnique({ where: { appUserId: u.appUserId } });
   const sub = await getCabinetSubscription(u.id, u.appUserId);
-  const step2 = sub.status === "active";
+  const now = new Date();
+  const hasAccess = subscriptionGrantsPaidFeatures(sub);
+  const trialActive = sub.status === "trialing" && !!sub.trialEndsAt && sub.trialEndsAt > now;
+  const paidMonthly =
+    sub.status === "active" && (!sub.currentPeriodEnd || sub.currentPeriodEnd > now);
+  const step2 = hasAccess;
   const step3 = tg?.status === "active";
   res.json({
     user: { id: u.id, email: u.email, appUserId: u.appUserId },
@@ -314,21 +327,30 @@ r.get("/me", requireCabinetUser, async (req, res) => {
     subscription: {
       status: sub.status,
       planCode: sub.planCode,
+      trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
+      trialActive,
       currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
-      paid: sub.status === "active",
-      nextPaymentDueAt: sub.status === "active" ? sub.currentPeriodEnd?.toISOString() ?? null : null,
+      hasAccess,
+      paid: paidMonthly,
+      priceMonthlyRub: MONTHLY_PRICE_RUB,
+      nextPaymentDueAt: paidMonthly ? sub.currentPeriodEnd?.toISOString() ?? null : null,
     },
     onboarding: {
       step1_accountDone: true,
       step2_paymentDone: step2,
       step3_telegramMtprotoDone: step3,
       appUserId: u.appUserId,
-      hint:
-        "Порядок: (1) аккаунт на сайте — готово. (2) Оплата помесячного тарифа — кнопка в кабинете. (3) Подключение личного Telegram — в кабинете «Личный Telegram» (номер + код из Telegram) или в боте; на сервере должен работать worker — появятся диалоги и автоответы.",
+      hint: trialActive
+        ? `Триал активен до ${sub.trialEndsAt?.toISOString() ?? "—"}. Успейте подключить личный Telegram. После триала — ${MONTHLY_PRICE_RUB} ₽ / мес в блоке «Статус».`
+        : paidMonthly
+          ? "Подключите личный Telegram в кабинете или в боте; на сервере должен работать worker — появятся диалоги и автоответы."
+          : `Оплатите ${MONTHLY_PRICE_RUB} ₽ за месяц в блоке «Статус», затем подключите личный Telegram.`,
     },
     billing: {
       simulatedPaymentAvailable: process.env.BILLING_ALLOW_SIMULATED_PAYMENT === "1",
-      yookassaConfigured: Boolean(process.env.YOOKASSA_SHOP_ID?.trim()),
+      yookassaConfigured: Boolean(
+        process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim(),
+      ),
     },
   });
 });

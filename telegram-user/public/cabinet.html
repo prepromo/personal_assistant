@@ -112,16 +112,16 @@
   <div class="howto">
     <h2>Три шага до полного доступа</h2>
     <ol>
-      <li><strong>Сайт — регистрация.</strong> Email и пароль (ниже) или «Вход через Telegram». Система сама выдаёт <code>appUserId</code> — его не нужно искать заранее.</li>
-      <li><strong>Сайт — оплата.</strong> Помесячный тариф; после подключения ЮKassa оплата пойдёт через платёжную форму. На стенде — тестовая кнопка, если на API задано <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>.</li>
-      <li><strong>Личный Telegram.</strong> После оплаты в кабинете (блок ниже) или в боте: номер в формате <code>+7…</code> → код из Telegram → при необходимости пароль 2FA. На сервере должен работать <strong>worker</strong> — тогда появятся диалоги и автоответы.</li>
+      <li><strong>Сайт — регистрация.</strong> Email и пароль (ниже) или «Вход через Telegram». Система сама выдаёт <code>appUserId</code>. После регистрации на сайте — <strong>1 день бесплатного доступа</strong> (подключение личного Telegram и функции кабинета).</li>
+      <li><strong>Сайт — тариф.</strong> После триала — <strong>500 ₽ за месяц</strong>. Оплата через ЮKassa / ЮMoney (кнопка в блоке «Статус»). На стенде без ЮKassa — тестовая кнопка при <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>. Досрочная оплата во время триала тоже возможна.</li>
+      <li><strong>Личный Telegram.</strong> В кабинете блок «Личный Telegram» или в боте: номер <code>+7…</code> → код из Telegram → при необходимости пароль 2FA. На сервере должен работать <strong>worker</strong> — тогда появятся диалоги и автоответы.</li>
     </ol>
     <p class="note" style="margin-bottom:0">Док: <a href="/docs/USER-TURN.md" target="_blank" rel="noopener">USER-TURN</a>, <a href="/docs/AUTOMATION.md" target="_blank" rel="noopener">AUTOMATION</a>. В @BotFather: <code>/setdomain</code> для виджета входа.</p>
   </div>
 
   <div id="authPanel">
     <h2>Шаг 1 — регистрация</h2>
-    <p class="note" style="margin-top:0">Сначала аккаунт на сайте, затем оплата (шаг 2), затем подключение личного Telegram в кабинете или в боте (шаг 3).</p>
+    <p class="note" style="margin-top:0">Сначала аккаунт на сайте (есть 1 день триала), затем при необходимости оплата (шаг 2), затем подключение личного Telegram (шаг 3).</p>
     <p class="note" style="text-align:center;margin-bottom:0.75rem"><strong>Вход через Telegram</strong> — подтверждение в приложении, без пароля.</p>
     <div id="telegram-widget-mount" style="display:flex;justify-content:center;min-height:52px;margin-bottom:1rem"></div>
     <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0" />
@@ -275,30 +275,74 @@
       const sub = data.subscription || {};
       const ob = data.onboarding || {};
       const bill = data.billing || {};
-      const paid = !!sub.paid;
-      const s1 = "done";
-      const s2 = paid ? "done" : "current";
-      const s3 = ob.step3_telegramMtprotoDone ? "done" : paid ? "current" : "";
-      const nextPay = sub.nextPaymentDueAt || sub.currentPeriodEnd
-        ? "<br/><span class=\"note\">Следующее списание (помесячно): <strong>" +
-          escHtml(sub.nextPaymentDueAt || sub.currentPeriodEnd) +
-          "</strong></span>"
-        : "";
+      const hasAccess = !!sub.hasAccess;
+      const trialActive = !!sub.trialActive;
+      const paidMonthly = !!sub.paid;
+      const price = Number(sub.priceMonthlyRub) || 500;
+      const s2 = hasAccess ? "done" : "current";
+      const s3 = ob.step3_telegramMtprotoDone ? "done" : hasAccess ? "current" : "";
+      const nextPay =
+        paidMonthly && (sub.nextPaymentDueAt || sub.currentPeriodEnd)
+          ? "<br/><span class=\"note\">Следующее продление: <strong>" +
+            escHtml(sub.nextPaymentDueAt || sub.currentPeriodEnd) +
+            "</strong></span>"
+          : "";
+
       let payBlock = "";
-      if (!paid) {
-        if (bill.simulatedPaymentAvailable && !bill.yookassaConfigured) {
-          payBlock =
-            '<div class="flow-actions"><button type="button" id="btnPayMonthlyFlow">Оплатить месяц (тест)</button></div><p class="note" style="margin:0.35rem 0 0">На проде подключите ЮKassa и отключите тестовую оплату.</p>';
-        } else if (bill.yookassaConfigured) {
-          payBlock =
-            '<p class="note" style="margin:0">Онлайн-оплата подключается (ЮKassa). Пока обратитесь к администратору или отключите <code>YOOKASSA_SHOP_ID</code> на стенде и задайте <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>.</p>';
-        } else {
-          payBlock =
-            '<p class="note" style="margin:0">Чтобы протестировать оплату без ЮKassa, на сервере API задайте <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>.</p>';
+      if (!hasAccess) {
+        const parts = [];
+        if (bill.yookassaConfigured) {
+          parts.push(
+            '<div class="flow-actions"><button type="button" id="btnPayYooFlow">Оплатить ' +
+              price +
+              ' ₽ / месяц</button></div>',
+          );
+          parts.push(
+            '<p class="note" style="margin:0.35rem 0 0">Откроется ЮKassa. После оплаты вернитесь в кабинет.</p>',
+          );
         }
+        if (bill.simulatedPaymentAvailable) {
+          parts.push(
+            '<div class="flow-actions"><button type="button" id="btnPayMonthlyFlow">Оплатить месяц (тест)</button></div>',
+          );
+          if (!bill.yookassaConfigured) {
+            parts.push('<p class="note" style="margin:0.35rem 0 0">Стенд без ЮKassa.</p>');
+          }
+        }
+        if (!bill.yookassaConfigured && !bill.simulatedPaymentAvailable) {
+          parts.push(
+            '<p class="note" style="margin:0">Задайте <code>YOOKASSA_SHOP_ID</code> и <code>YOOKASSA_SECRET_KEY</code> или для стенда <code>BILLING_ALLOW_SIMULATED_PAYMENT=1</code>.</p>',
+          );
+        }
+        payBlock = parts.join("");
+      } else if (paidMonthly) {
+        payBlock = '<p class="status-ok" style="margin:0">Подписка оплачена.' + nextPay + "</p>";
+      } else if (trialActive) {
+        payBlock =
+          '<p class="status-ok" style="margin:0 0 0.5rem">Пробный период до <strong>' +
+          escHtml(sub.trialEndsAt || "") +
+          "</strong>. Полный доступ к кабинету.</p>" +
+          '<p class="note" style="margin:0 0 0.5rem">После триала — <strong>' +
+          price +
+          " ₽</strong> за месяц. Можно оплатить заранее.</p>";
+        const trialExtras = [];
+        if (bill.yookassaConfigured) {
+          trialExtras.push(
+            '<div class="flow-actions"><button type="button" id="btnPayYooFlow">Оплатить ' +
+              price +
+              ' ₽ / месяц</button></div>',
+          );
+        }
+        if (bill.simulatedPaymentAvailable) {
+          trialExtras.push(
+            '<div class="flow-actions"><button type="button" id="btnPayMonthlyFlow">Тест: активировать месяц</button></div>',
+          );
+        }
+        payBlock += trialExtras.join("");
       } else {
-        payBlock = '<p class="status-ok" style="margin:0">Оплачено.' + nextPay + "</p>";
+        payBlock = '<p class="status-ok" style="margin:0">Доступ активен.</p>';
       }
+
       const step3txt = ob.step3_telegramMtprotoDone
         ? "Личный Telegram подключён. Запустите worker на сервере — подтянутся диалоги."
         : "В блоке <strong>«Личный Telegram»</strong> слева введите номер и код (или откройте бота" +
@@ -313,16 +357,19 @@
         "</div>" +
         '<div class="flow-step ' +
         s2 +
-        '"><span class="tag">Шаг 2</span><br/><strong>Оплата</strong> (помесячный тариф)' +
+        '"><span class="tag">Шаг 2</span><br/><strong>Тариф</strong> (1 день бесплатно, затем ' +
+        price +
+        " ₽ / мес)" +
         payBlock +
         "</div>" +
         '<div class="flow-step ' +
-        (s3 || (paid ? "current" : "")) +
+        (s3 || (hasAccess && !ob.step3_telegramMtprotoDone ? "current" : "")) +
         '"><span class="tag">Шаг 3</span><br/><strong>Контакты и личный Telegram</strong><br/>' +
         step3txt +
         '</div><div class="flow-actions" style="margin-top:0.5rem"><code id="flowAppUserId" style="font-size:0.8rem;word-break:break-all;flex:1;min-width:200px;padding:0.35rem 0.5rem;background:#0e1520;border-radius:6px;border:1px solid var(--border)">' +
         escHtml(data.user.appUserId) +
         '</code><button type="button" class="secondary" id="btnCopyAppUserId">Копировать appUserId</button></div>';
+
       const payBtn = document.getElementById("btnPayMonthlyFlow");
       if (payBtn) {
         payBtn.onclick = async () => {
@@ -339,6 +386,34 @@
           }
           const fresh = await loadMe();
           if (fresh) await applyLoggedInUi(fresh);
+        };
+      }
+      const yooBtn = document.getElementById("btnPayYooFlow");
+      if (yooBtn) {
+        yooBtn.onclick = async () => {
+          yooBtn.disabled = true;
+          try {
+            const r = await api("/api/v1/cabinet/billing/create-payment", {
+              method: "POST",
+              body: "{}",
+            });
+            const t = await r.text();
+            let j = {};
+            try {
+              j = JSON.parse(t);
+            } catch (_) {}
+            if (!r.ok) {
+              alert(t);
+              return;
+            }
+            if (j.confirmationUrl) {
+              window.location.href = j.confirmationUrl;
+              return;
+            }
+            alert("Нет ссылки оплаты: " + t);
+          } finally {
+            yooBtn.disabled = false;
+          }
         };
       }
       const copyBtn = document.getElementById("btnCopyAppUserId");
@@ -810,8 +885,14 @@
     (async () => {
       const usp = new URLSearchParams(location.search);
       const te = usp.get("tg_err");
+      const paymentReturn = usp.get("payment");
       if (te) $("authErr").textContent = "Вход через Telegram: " + te;
       if (usp.get("tg_ok")) {
+        try {
+          history.replaceState({}, "", location.pathname);
+        } catch (_) {}
+      }
+      if (paymentReturn === "return") {
         try {
           history.replaceState({}, "", location.pathname);
         } catch (_) {}
@@ -819,6 +900,16 @@
       const data = await loadMe();
       if (data && data.user) {
         await applyLoggedInUi(data);
+        if (paymentReturn === "return") {
+          const br = await api("/api/v1/cabinet/billing");
+          if (br.ok) {
+            try {
+              const bj = await br.json();
+              if (bj.paid) alert("Оплата прошла. Подписка активна до " + (bj.currentPeriodEnd || "") + ".");
+              else alert("Если вы уже оплатили, подождите минуту и обновите страницу (уведомление ЮKassa).");
+            } catch (_) {}
+          }
+        }
       } else {
         showAuth();
         await mountTelegramLoginWidget();

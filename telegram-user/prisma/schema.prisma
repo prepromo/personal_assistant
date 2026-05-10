@@ -73,6 +73,7 @@ enum ComradeTemplateType {
 
 /// Подписка веб-кабинета (оплата на сайте; без записи — дозаполняется при /me)
 enum CabinetSubscriptionStatus {
+  trialing
   pending_payment
   active
   canceled
@@ -98,6 +99,8 @@ model CabinetSubscription {
   cabinetUser      CabinetUser               @relation(fields: [cabinetUserId], references: [id], onDelete: Cascade)
   status           CabinetSubscriptionStatus @default(pending_payment)
   planCode         String                    @default("monthly")
+  /// Конец пробного периода (например 24 ч после register-web); только при status=trialing
+  trialEndsAt      DateTime?
   currentPeriodEnd DateTime?
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
